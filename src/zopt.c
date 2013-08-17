@@ -64,6 +64,7 @@ const char *gengetopt_args_info_help[] = {
   "  -C, --config=filename         Read a configuration file, which can specify \n                                  any of these options  \n                                  (default=`/etc/zmap/zmap.conf')",
   "  -q, --quiet                   Do not print status updates",
   "  -g, --summary                 Print configuration and summary at end of scan",
+  "      --no-duplicate-checking   Do not check for duplicate packets. Reduces \n                                  memory usage",
   "  -v, --verbosity=n             Level of log detail (0-5)  (default=`3')",
   "  -h, --help                    Print help and exit",
   "  -V, --version                 Print version and exit",
@@ -143,6 +144,7 @@ void clear_given (struct gengetopt_args_info *args_info)
   args_info->config_given = 0 ;
   args_info->quiet_given = 0 ;
   args_info->summary_given = 0 ;
+  args_info->no_duplicate_checking_given = 0 ;
   args_info->verbosity_given = 0 ;
   args_info->help_given = 0 ;
   args_info->version_given = 0 ;
@@ -228,9 +230,10 @@ void init_args_info(struct gengetopt_args_info *args_info)
   args_info->config_help = gengetopt_args_info_help[29] ;
   args_info->quiet_help = gengetopt_args_info_help[30] ;
   args_info->summary_help = gengetopt_args_info_help[31] ;
-  args_info->verbosity_help = gengetopt_args_info_help[32] ;
-  args_info->help_help = gengetopt_args_info_help[33] ;
-  args_info->version_help = gengetopt_args_info_help[34] ;
+  args_info->no_duplicate_checking_help = gengetopt_args_info_help[32] ;
+  args_info->verbosity_help = gengetopt_args_info_help[33] ;
+  args_info->help_help = gengetopt_args_info_help[34] ;
+  args_info->version_help = gengetopt_args_info_help[35] ;
   
 }
 
@@ -432,6 +435,8 @@ cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
     write_into_file(outfile, "quiet", 0, 0 );
   if (args_info->summary_given)
     write_into_file(outfile, "summary", 0, 0 );
+  if (args_info->no_duplicate_checking_given)
+    write_into_file(outfile, "no-duplicate-checking", 0, 0 );
   if (args_info->verbosity_given)
     write_into_file(outfile, "verbosity", args_info->verbosity_orig, 0);
   if (args_info->help_given)
@@ -715,6 +720,7 @@ cmdline_parser_internal (
         { "config",	1, NULL, 'C' },
         { "quiet",	0, NULL, 'q' },
         { "summary",	0, NULL, 'g' },
+        { "no-duplicate-checking",	0, NULL, 0 },
         { "verbosity",	1, NULL, 'v' },
         { "help",	0, NULL, 'h' },
         { "version",	0, NULL, 'V' },
@@ -1093,6 +1099,20 @@ cmdline_parser_internal (
                 &(local_args_info.list_probe_modules_given), optarg, 0, 0, ARG_NO,
                 check_ambiguity, override, 0, 0,
                 "list-probe-modules", '-',
+                additional_error))
+              goto failure;
+          
+          }
+          /* Do not check for duplicate packets. Reduces memory usage.  */
+          else if (strcmp (long_options[option_index].name, "no-duplicate-checking") == 0)
+          {
+          
+          
+            if (update_arg( 0 , 
+                 0 , &(args_info->no_duplicate_checking_given),
+                &(local_args_info.no_duplicate_checking_given), optarg, 0, 0, ARG_NO,
+                check_ambiguity, override, 0, 0,
+                "no-duplicate-checking", '-',
                 additional_error))
               goto failure;
           

@@ -108,6 +108,7 @@ struct gengetopt_args_info
   const char *config_help; /**< @brief Read a configuration file, which can specify any of these options help description.  */
   const char *quiet_help; /**< @brief Do not print status updates help description.  */
   const char *summary_help; /**< @brief Print configuration and summary at end of scan help description.  */
+  const char *no_duplicate_checking_help; /**< @brief Do not check for duplicate packets. Reduces memory usage help description.  */
   int verbosity_arg;	/**< @brief Level of log detail (0-5) (default='3').  */
   char * verbosity_orig;	/**< @brief Level of log detail (0-5) original value given at command line.  */
   const char *verbosity_help; /**< @brief Level of log detail (0-5) help description.  */
@@ -141,6 +142,7 @@ struct gengetopt_args_info
   unsigned int config_given ;	/**< @brief Whether config was given.  */
   unsigned int quiet_given ;	/**< @brief Whether quiet was given.  */
   unsigned int summary_given ;	/**< @brief Whether summary was given.  */
+  unsigned int no_duplicate_checking_given ;	/**< @brief Whether no-duplicate-checking was given.  */
   unsigned int verbosity_given ;	/**< @brief Whether verbosity was given.  */
   unsigned int help_given ;	/**< @brief Whether help was given.  */
   unsigned int version_given ;	/**< @brief Whether version was given.  */

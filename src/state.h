@@ -74,6 +74,7 @@ struct state_conf {
 	int dryrun;
 	int summary;
 	int quiet;
+	int dupchk;
 	int recv_ready;
 };
 extern struct state_conf zconf;

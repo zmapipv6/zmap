@@ -11,6 +11,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <assert.h>
 
 #include <pcap.h>
 #include <pcap/pcap.h>
@@ -48,12 +49,14 @@ static const int IP_SEEN_SIZE = 0x4000000; // == 2^32/64
 // check if we've received a response from this address previously
 static inline int check_ip(uint32_t ip)
 {
+	assert(ip_seen);
 	return (ip_seen[ip >> 6] >> (ip & 0x3F)) & 1;
 }
 
 // set that we've received a response from the address
 static inline void set_ip(uint32_t ip)
 {
+	assert(ip_seen);
 	ip_seen[ip >> 6] |= (uint64_t)1 << (ip & 0x3F);
 }
 
@@ -90,15 +93,22 @@ void packet_cb(u_char __attribute__((__unused__)) *user,
 				&src_ip, validation)) {
 		return;
 	}
-
-	int is_repeat = check_ip(src_ip);
+	
+	int is_repeat;
+	if (zconf.dupchk) {
+		is_repeat = check_ip(src_ip);
+	} else {
+		is_repeat = 0;
+	}
 	response_type_t *r = zconf.probe_module->classify_packet(bytes, buflen);
 
 	if (r->is_success) {
 		zrecv.success_total++;
 		if (!is_repeat) {
 			zrecv.success_unique++;
-			set_ip(src_ip);
+			if (zconf.dupchk) {
+				set_ip(src_ip);
+			}
 		}
 		if (zsend.complete) { 
 			zrecv.cooldown_total++;
@@ -148,10 +158,20 @@ int recv_run(pthread_mutex_t *recv_ready_mutex)
 {
 	log_debug("recv", "thread started");
 	num_src_ports = zconf.source_port_last - zconf.source_port_first + 1;
-	ip_seen = calloc(IP_SEEN_SIZE, sizeof(uint64_t));
-	if (!ip_seen) {
-		log_fatal("recv", "couldn't allocate address bitmap");
-	}
+	if (zconf.dupchk) { 
+		ip_seen = calloc(IP_SEEN_SIZE, sizeof(uint64_t));
+		if (!ip_seen) {
+			log_fatal("recv", "couldn't allocate address bitmap."
+					"ZMap requires approximately 600MB "
+					"of memory in order to check for duplicate "
+					"responses. If you do not have sufficient "
+					"memory, you can disable duplicate checking "
+					"by specifying --no-duplicate-checking.");
+		}
+		log_debug("recv", "duplicate checking enabled. bitmap allocated.");
+	} else {
+		log_debug("recv", "duplicate checking disabled.");
+	}	
 	log_debug("recv", "using dev %s", zconf.iface);
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pc = pcap_open_live(zconf.iface, zconf.probe_module->pcap_snaplen,

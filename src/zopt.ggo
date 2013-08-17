@@ -104,6 +104,8 @@ option "quiet"				q "Do not print status updates"
        optional
 option "summary"			g "Print configuration and summary at end of scan"
        optional
+option "no-duplicate-checking"		- "Do not check for duplicate packets. Reduces memory usage"
+	optional
 option "verbosity"			v "Level of log detail (0-5)"
 	   typestr="n"
 	   default="3"

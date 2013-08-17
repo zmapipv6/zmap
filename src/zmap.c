@@ -110,6 +110,7 @@ static void summary(void)
 	SS("cnf", "send-interface", zconf.iface);
 	SI("cnf", "rate", zconf.rate);
 	SLU("cnf", "bandwidth", zconf.bandwidth);
+	SI("cnf", "duplicate-checking", zconf.dupchk);
 	SU("env", "nprocessors", (unsigned) sysconf(_SC_NPROCESSORS_ONLN));
 	SS("exc", "send-start-time", send_start_time);
 	SS("exc", "send-end-time", send_end_time);
@@ -355,7 +356,9 @@ int main(int argc, char *argv[])
 	zconf.cooldown_secs = args.cooldown_time_arg;
 	zconf.senders = args.sender_threads_arg;
 	zconf.log_level = args.verbosity_arg;
-
+	if (args.no_duplicate_checking_given) {
+		zconf.dupchk = 0;
+	}
 	zconf.output_module = get_output_module_by_name(args.output_module_arg);
 	if (!zconf.output_module) {
 	  fprintf(stderr, "%s: specified output module (%s) does not exist\n",
