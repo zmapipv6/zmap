@@ -12,7 +12,7 @@
 #include "../lib/logger.h"
 
 //
-// Efficient address-space constraints  (AH 7/2013)
+// Efficient address-space constraints	(AH 7/2013)
 //
 // This module uses a tree-based representation to efficiently
 // manipulate and query constraints on the address space to be
@@ -57,12 +57,21 @@ typedef struct node {
 // length:
 #define RADIX_LENGTH 20
 
+typedef struct ip_index {
+	uint32_t count;		// the base count for this (/RADIX_LENGTH-sized) prefix
+	uint8_t in_tree;	// 0 if you can use count as the base for this prefix
+						// 1 if you must lookup in the tree
+} ip_index_t;
+
 struct _constraint {
-	node_t *root;     // root node of the tree
-	uint32_t *radix;  // array of prefixes (/RADIX_LENGTH) that are painted paint_value
-	size_t radix_len; // number of prefixes in radix array
-	int painted;      // have we precomputed counts for each node?
-	value_t paint_value; // value for which we precomputed counts
+	node_t *root;			// root node of the tree
+	uint32_t *radix;		// array of prefixes (/RADIX_LENGTH) that are painted paint_value
+	size_t radix_len;		// number of prefixes in radix array
+
+	ip_index_t *ip_radix;	//map from ip addresses to index (or node in tree)
+
+	int painted;			// have we precomputed counts for each node?
+	value_t paint_value;	// value for which we precomputed counts
 };
 
 // Tree operations respect the invariant that every node that isn't a
@@ -157,7 +166,7 @@ void constraint_set(constraint_t *con, uint32_t prefix, int len, value_t value)
 }
 
 // Return the value pertaining to an address, according to the tree
-// starting at given root.  (Note: address must be in host byte order.)
+// starting at given root.	(Note: address must be in host byte order.)
 static int _lookup_ip(node_t *root, uint32_t address)
 {
 	assert(root);
@@ -221,7 +230,7 @@ uint32_t constraint_lookup_index(constraint_t *con, uint64_t index, value_t valu
 	uint64_t radix_idx = index / (1 << (32 - RADIX_LENGTH));
 	if (radix_idx < con->radix_len) {
 		// Radix lookup
-		uint32_t radix_offset = index % (1 << (32 - RADIX_LENGTH));	// TODO: bitwise maths
+		uint32_t radix_offset = index & ((1 << (32 - RADIX_LENGTH)) - 1);	// index % (1<<32-RADIX_LEN)
 		return con->radix[radix_idx] | radix_offset;
 	}
 
@@ -233,7 +242,52 @@ uint32_t constraint_lookup_index(constraint_t *con, uint64_t index, value_t valu
 	return _lookup_index(con->root, index);
 }
 
-// Implement count_ips by recursing on halves of the tree.  Size represents
+static uint64_t _ip_to_idx(node_t *root, uint32_t address)
+{
+	assert(root);
+	node_t *node = root;
+	uint64_t mask = 0x80000000;
+	uint64_t idx = 0;
+	while (mask) {
+		if (IS_LEAF(node)) {
+			log_trace("_ip_to_idx", "%lu + %lu (mask = %08x)", idx, (address & ((mask<<1) - 1)), mask);
+			return idx + (address & ((mask<<1) - 1));
+		}
+		if (address & mask) {
+			idx += node->l->count;
+			log_trace("_ip_to_idx", "%08x & %08x == 1, moving right, adding %lu (%lu); count here is %lu",
+				address, mask, node->l->count, idx, node->count);
+			node = node->r;
+		} else {
+			log_trace("_ip_to_idx", "%08x & %08x == 0, moving left (%lu to right) (idx=%lu); count here is %lu",
+				address, mask, node->r->count, idx, node->count);
+			node = node->l;
+		}
+		mask >>= 1;
+	}
+	return idx;
+}
+
+// For a given IP address, return the zero-based index.
+uint64_t constraint_ip_to_idx(constraint_t *con, uint32_t addr, value_t value)
+{
+	assert(con);
+	if (!con->painted || con->paint_value != value) {
+		constraint_paint_value(con, value);
+	}
+
+	// check ip_radix for either a count or a node
+	ip_index_t *idx_node = &con->ip_radix[addr >> (32 - RADIX_LENGTH)];
+	if (idx_node->in_tree == 0) {
+		return idx_node->count + (addr & ((1 << (32 - RADIX_LENGTH)) - 1));
+	}
+
+	uint64_t idx = _ip_to_idx(con->root, addr);
+	log_trace("constraint_ip_to_idx", "ip_to_idx: %lu", idx);
+	return ((uint64_t)con->radix_len * (1 << (32 - RADIX_LENGTH))) + idx;
+}
+
+// Implement count_ips by recursing on halves of the tree.	Size represents
 // the number of addresses in a prefix at the current level of the tree.
 // If paint is specified, each node will have its count set to the number of
 // leaves under it set to value.
@@ -307,8 +361,16 @@ void constraint_paint_value(constraint_t *con, value_t value)
 		uint32_t prefix = i << (32 - RADIX_LENGTH);
 		node_t *node = _lookup_node(con->root, prefix, RADIX_LENGTH);
 		if (IS_LEAF(node) && node->value == value) {
-			// Add this prefix to the radix
-			con->radix[con->radix_len++] = prefix;
+			// Add this prefix to the radix (index->ip)
+			con->radix[con->radix_len] = prefix;
+
+			// and add to reverse mapping radix (ip->index)
+			con->ip_radix[i].count = con->radix_len * (1 << (32 - RADIX_LENGTH));
+
+			con->radix_len++;
+		} else {
+			// Will have to look this one up using the tree
+			con->ip_radix[i].in_tree = 1;
 		}
 	}
 	log_debug("constraint", "%lu IPs in radix array, %lu IPs in tree",
@@ -336,7 +398,8 @@ constraint_t* constraint_init(value_t value)
 	constraint_t* con = malloc(sizeof(constraint_t));
 	con->root = _create_leaf(value);
 	con->radix = calloc(sizeof(uint32_t), 1 << RADIX_LENGTH);
-	assert(con->radix);
+	con->ip_radix = calloc(sizeof(ip_index_t), 1 << RADIX_LENGTH);
+	assert(con->radix && con->ip_radix);
 	con->painted = 0;
 	return con;
 }
@@ -348,6 +411,7 @@ void constraint_free(constraint_t *con)
 	log_trace("constraint", "Cleaning up");
 	_destroy_subtree(con->root);
 	free(con->radix);
+	free(con->ip_radix);
 	free(con);
 }
 

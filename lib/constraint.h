@@ -12,6 +12,7 @@ void constraint_set(constraint_t *con, uint32_t prefix, int len, value_t value);
 value_t constraint_lookup_ip(constraint_t *con, uint32_t address);
 uint64_t constraint_count_ips(constraint_t *con, value_t value);
 uint32_t constraint_lookup_index(constraint_t *con, uint64_t index, value_t value);
+uint64_t constraint_ip_to_idx(constraint_t *con, uint32_t addr, value_t value);
 void constraint_paint_value(constraint_t *con, value_t value);
 
 #endif //_CONSTRAINT_H
