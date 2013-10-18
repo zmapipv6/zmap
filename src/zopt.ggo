@@ -10,9 +10,9 @@ purpose "A fast Internet-wide scanner."
 
 section "Basic arguments"
 
-option "target-port"    	p "TCP port number to scan (for SYN scans)"
+option "target-port"    	p "TCP port number(s) to scan (for SYN scans)"
 	   typestr="port"
-	   optional int
+	   optional string
 option "output-file"  		o "Output file"
 	   typestr="name"
 	   optional string

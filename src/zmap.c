@@ -146,7 +146,7 @@ static void summary(void)
 	assert(dstrftime(recv_end_time, STRTIME_LEN, "%c", zrecv.finish));
 	double hitrate = ((double) 100 * zrecv.success_unique)/((double)zsend.sent);
 
-	SU("cnf", "target-port", zconf.target_port);
+	SS("cnf", "target-port", zconf.target_port);
 	SU("cnf", "source-port-range-begin", zconf.source_port_first);
 	SU("cnf", "source-port-range-end", zconf.source_port_last);
 	SS("cnf", "source-addr-range-begin", zconf.source_ip_first);
