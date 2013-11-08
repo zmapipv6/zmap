@@ -216,7 +216,7 @@ int send_run(int sock)
 	memset(buf, 0, MAX_PACKET_SIZE);
 	zconf.probe_module->thread_initialize(buf, 
 					(unsigned char *)if_mac.ifr_hwaddr.sa_data, 
-					zconf.gw_mac, zconf.target_port);	
+					zconf.gw_mac, zconf.target_ports[0]);	
 	pthread_mutex_unlock(&send_mutex);
 
 	// adaptive timing to hit target rate

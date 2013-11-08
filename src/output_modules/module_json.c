@@ -52,7 +52,7 @@ int json_output_file_init(struct state_conf *conf, UNUSED char **fields, UNUSED 
 		json_object_object_add(obj, "type", json_object_new_string("header"));
 		json_object_object_add(obj, "log_level", json_object_new_int(conf->log_level));
 		json_object_object_add(obj, "target_port",
-				json_object_new_int(conf->target_port));
+				json_object_new_int(conf->target_ports[0]));
 		json_object_object_add(obj, "source_port_first",
 				json_object_new_int(conf->source_port_first));
 		json_object_object_add(obj, "source_port_last",

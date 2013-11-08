@@ -167,7 +167,7 @@ int udp_init_perthread(void* buf, macaddr_t *src,
 
 	struct udphdr *udp_header = (struct udphdr*)(&ip_header[1]);
 	len = sizeof(struct udphdr) + udp_send_msg_len;
-	make_udp_header(udp_header, zconf.target_port, len);
+	make_udp_header(udp_header, zconf.target_ports[0], len);
 
 	char* payload = (char*)(&udp_header[1]);
 
@@ -298,7 +298,7 @@ int udp_validate_packet(const struct iphdr *ip_hdr, uint32_t len,
 	} else {
 		return 0;
 	}
-	if (dport != zconf.target_port) {
+	if (dport != zconf.target_ports[0]) {
 		return 0;
 	}
 	if (!check_dst_port(sport, num_ports, validation)) {

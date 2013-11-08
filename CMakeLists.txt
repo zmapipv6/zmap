@@ -1,10 +1,13 @@
 cmake_minimum_required (VERSION 2.6)
 project (ZMAP C)
 
+set(CMAKE_BINARY_DIR "${PROJECT_SOURCE_DIR}/bin")
+
 option(WITH_REDIS "Build with support for Redis DB" OFF)
 option(WITH_JSON "Build with support for JSON" OFF)
 option(ENABLE_DEVELOPMENT "Enable development specific compiler and linker flags" OFF)
 option(ENABLE_HARDENING "Add hardening specific compiler and linker flags" ON)
+option(ENABLE_TEST "Enable building of regression tests" OFF)
 
 if(ENABLE_DEVELOPMENT)
 	# Hardening and warnings for building with gcc
@@ -61,7 +64,16 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread")
 set(CMAKE_C_FLAGS_DEBUG "-O2 -g")
 set(CMAKE_C_FLAGS_RELEASE "-O2")
 
-add_subdirectory(src)
+# Set up ZMap target and sources
+add_subdirectory("${CMAKE_SOURCE_DIR}/src" "${CMAKE_BINARY_DIR}/zmap")
+
+# Set up testing, if enabled
+if (ENABLE_TEST)
+	enable_testing()
+	add_subdirectory("${PROJECT_SOURCE_DIR}/test" "${CMAKE_BINARY_DIR}/test")
+endif()
+
+
 
 # Install conf files
 FILE(GLOB CONF_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/conf" "conf/*")

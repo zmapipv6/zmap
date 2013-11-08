@@ -36,6 +36,7 @@ struct fieldset_conf {
 // global configuration
 struct state_conf {
 	int log_level;
+	char* target_ports_str;
 	int target_ports_len;
 	port_h_t *target_ports;
 	port_h_t source_port_first;

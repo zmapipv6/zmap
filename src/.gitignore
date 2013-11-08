@@ -2,3 +2,5 @@ lexer.c
 lexer.h
 parser.c
 parser.h
+zopt.c
+zopt.h

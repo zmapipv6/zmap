@@ -1,0 +1,18 @@
+
+SET(TEST_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+
+SET(TEST_LIB_SOURCES
+	"${TEST_SOURCE_DIR}/lib/unit_test_framework.c"
+)
+
+SET(TEST_MODULE_SOURCES
+	"${TEST_SOURCE_DIR}/util_test.c"
+)
+
+SET(TEST_SOURCES
+	"${TEST_SOURCE_DIR}/test_main.c"
+	${TEST_LIB_SOURCES}
+	${TEST_MODULE_SOURCES}
+)
+
+add_executable(zmap-test ${SOURCES} ${TEST_SOURCES})

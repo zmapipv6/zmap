@@ -37,6 +37,7 @@
 #include "monitor.h"
 #include "get_gateway.h"
 #include "filter.h"
+#include "util.h"
 
 #include "output_modules/output_modules.h"
 #include "probe_modules/probe_modules.h"
@@ -55,7 +56,7 @@ static void split_string(char* in, int *len, char***results)
         char *currloc = in; 
         // parse csv into a set of strings
         while (1) {
-                size_t len = strcspn(currloc, ", ");    
+                size_t len = strcspn(currloc, ", ");
                 if (len == 0) {
                         currloc++;
                 } else {
@@ -73,6 +74,39 @@ static void split_string(char* in, int *len, char***results)
         }
         *results = fields;
         *len = retvlen;
+}
+
+static void parse_ranges(char **in, int in_len, port_h_t **ports, int *ports_len) {
+	int i, p = 0;
+	port_h_t port;
+	*ports = malloc(0xFFFF * sizeof(port_h_t));
+	for (i = 0; i < in_len; ++i) {
+		char *str = in[i];
+		char *dash = strchr(str, '-');
+		if (dash) {
+			// Looking at a range
+			*dash = '\0';
+			int range_begin = atoi(str);
+			int range_end = atoi(dash + 1);
+			enforce_range("target-port", range_begin, 0, 0xFFFF);
+			enforce_range("target-port", range_end, 0, 0xFFFF);
+			if (range_begin > range_end) {
+				fprintf(stderr, "%s: Invalid target port range: "
+						"last port is less than first port\n",
+						CMDLINE_PARSER_PACKAGE);
+				exit(EXIT_FAILURE);
+			}
+			for (port = range_begin; port <= range_end; ++port) {
+				(*ports)[p++] = port;
+			}
+		} else {
+			// Single port
+			port = atoi(str);
+			enforce_range("target-port", port, 0, 0xFFFF);
+			(*ports)[p++] = port;
+		}
+	}
+	*ports_len = p;
 }
 
 static void set_cpu(void)
@@ -150,7 +184,7 @@ static void summary(void)
 	assert(dstrftime(recv_end_time, STRTIME_LEN, "%c", zrecv.finish));
 	double hitrate = ((double) 100 * zrecv.success_unique)/((double)zsend.sent);
 
-	SS("cnf", "target-port", zconf.target_port);
+	SS("cnf", "target-port", zconf.target_ports_str);
 	SU("cnf", "source-port-range-begin", zconf.source_port_first);
 	SU("cnf", "source-port-range-end", zconf.source_port_last);
 	SS("cnf", "source-addr-range-begin", zconf.source_ip_first);
@@ -313,15 +347,6 @@ static void start_zmap(void)
 		zconf.probe_module->close(&zconf, &zsend, &zrecv);
 	}
 	log_info("zmap", "completed");
-}
-
-static void enforce_range(const char *name, int v, int min, int max)
-{
-	if (v < min || v > max) {
-	  	fprintf(stderr, "%s: argument `%s' must be between %d and %d\n",
-			CMDLINE_PARSER_PACKAGE, name, min, max);
-		exit(EXIT_FAILURE);
-	}
 }
 
 static int file_exists(char *name)
@@ -636,8 +661,14 @@ int main(int argc, char *argv[])
 				CMDLINE_PARSER_PACKAGE);
 			exit(EXIT_FAILURE);
 		}
-		enforce_range("target-port", args.target_port_arg, 0, 0xFFFF);
-		zconf.target_port = args.target_port_arg;
+
+		// Grab the target port range
+		zconf.target_ports_str = args.target_port_arg;
+		char** ports_str_list;
+		int ports_str_list_len;
+		split_string(zconf.target_ports_str, &ports_str_list_len, 
+				&ports_str_list);
+		parse_ranges(ports_str_list, ports_str_list_len, &zconf.target_ports, &zconf.target_ports_len);
 	}
 	if (args.source_ip_given) {
 		char *dash = strchr(args.source_ip_arg, '-');

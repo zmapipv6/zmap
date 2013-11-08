@@ -104,7 +104,7 @@ int synscan_validate_packet(const struct iphdr *ip_hdr, uint32_t len,
 	uint16_t sport = tcp->source;
 	uint16_t dport = tcp->dest;
 	// validate source port
-	if (ntohs(sport) != zconf.target_port) {
+	if (ntohs(sport) != zconf.target_ports[0]) {
 		return 0;
 	}
 	// validate destination port
