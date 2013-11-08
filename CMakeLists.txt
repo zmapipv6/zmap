@@ -69,7 +69,19 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/src" "${CMAKE_BINARY_DIR}/zmap")
 
 # Set up testing, if enabled
 if (ENABLE_TEST)
+	include(FindPkgConfig)
+	pkg_check_modules(CHECK check)
+	if(CHECK_FOUND)
+		include_directories(CHECK_INCLUDE_DIRS)
+	else()
+		message(FATAL_ERROR "Did not find check")
+	endif()
+
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CHECK_CFLAGS}")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${CHECK_LDFLAGS}")
 	enable_testing()
+	set(CMAKE_CTEST_COMMAND ctest -V)
+	add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
 	add_subdirectory("${PROJECT_SOURCE_DIR}/test" "${CMAKE_BINARY_DIR}/test")
 endif()
 

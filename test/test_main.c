@@ -1,12 +1,14 @@
 #include "util_test.h"
 
-#include <stdio.h>
+#include <stdlib.h>
+#include <check.h>
 
-int main(int argc, const char *argv[]) {
-	int i;
-	printf("argc: %d\n", argc);
-	for (i = 0; i < argc; ++i) {
-		printf("argv[%d]: %s\n", i, argv[i]);
-	}
-	return 0;
+int main() {
+	int number_failed = 0;
+	Suite *util = util_suite();
+	SRunner *sr = srunner_create(util);
+	srunner_run_all(sr, CK_NORMAL);
+	number_failed = srunner_ntests_failed(sr);
+	srunner_free(sr);
+	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

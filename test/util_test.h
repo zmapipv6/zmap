@@ -1,2 +1,8 @@
+#ifndef UTIL_TEST_H
+#define UTIL_TEST_H
 
-int test_func();
+#include <check.h>
+
+Suite* util_suite();
+
+#endif
