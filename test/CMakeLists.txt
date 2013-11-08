@@ -11,6 +11,8 @@ SET(TEST_SOURCES
 	"${TEST_SOURCE_DIR}/test_main.c"
 	${TEST_MODULE_SOURCES}
 )
+message(STATUS "yolo")
+message(STATUS ${LIB_SOURCE_DIR})
 
 # Unit test executable
 add_executable(zmap-unit-test EXCLUDE_FROM_ALL ${SOURCES} ${TEST_SOURCES})
