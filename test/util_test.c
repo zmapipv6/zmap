@@ -1,5 +1,5 @@
 #include "util_test.h"
-#include "../lib/util.c"
+#include "util.h"
 
 #include <check.h>
 

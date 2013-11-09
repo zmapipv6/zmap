@@ -1,15 +1,3 @@
-SET(ZMAP_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src")
-SET(PROBE_MODULE_SOURCE_DIR "${ZMAP_SOURCE_DIR}/probe_modules")
-SET(OUTPUT_MODULE_SOURCE_DIR "${ZMAP_SOURCE_DIR}/output_modules")
-SET(LIB_SOURCE_DIR "${PROJECT_SOURCE_DIR}/lib")
-
-message(STATUS ${LIB_SOURCE_DIR})
-include_directories(
-	${LIB_SOURCE_DIR}
-	${ZMAP_SOURCE_DIR}
-	${OUTPUT_MODULE_SOURCE_DIR}
-	)
-
 SET(LIB_SOURCES
 	"${LIB_SOURCE_DIR}/blacklist.c"
 	"${LIB_SOURCE_DIR}/constraint.c"
@@ -70,6 +58,18 @@ SET(ZOPT_FILES "${ZMAP_SOURCE_DIR}/zopt.h")
 SET(PARSER_FILES "${ZMAP_SOURCE_DIR}/parser.c")
 SET(LEXER_FILES "${ZMAP_SOURCE_DIR}/lexer.c")
 
+add_custom_command(OUTPUT ${ZOPT_FILES}
+	COMMAND gengetopt -C --no-help --no-version --unamed-opts=SUBNETS -i "${ZMAP_SOURCE_DIR}/zopt.ggo" -F "${ZMAP_SOURCE_DIR}/zopt"
+)
+
+add_custom_command(OUTPUT ${LEXER_FILES}
+	COMMAND flex -o "${ZMAP_SOURCE_DIR}/lexer.c" --header-file="${ZMAP_SOURCE_DIR}/lexer.h" "${ZMAP_SOURCE_DIR}/lexer.l"
+)
+
+add_custom_command(OUTPUT ${PARSER_FILES}
+	COMMAND byacc -d -o "${ZMAP_SOURCE_DIR}/parser.c" "${ZMAP_SOURCE_DIR}/parser.y"
+)
+
 SET(SOURCES
 	${ZMAP_SOURCES}
 	${EXTRA_PROBE_MODULES}
@@ -87,28 +87,47 @@ if (WITH_REDIS)
 	SET(SOURCES ${SOURCES} ${LIB_SOURCE_DIR}/redis.c ${OUTPUT_MODULE_SOURCE_DIR}/module_redis.c ${OUTPUT_MODULE_SOURCE_DIR}/module_csvredis.c)
 endif()
 
-add_custom_command(OUTPUT ${ZOPT_FILES}
-	COMMAND gengetopt -C --no-help --no-version --unamed-opts=SUBNETS -i "${ZMAP_SOURCE_DIR}/zopt.ggo" -F "${ZMAP_SOURCE_DIR}/zopt"
-)
-
-add_custom_command(OUTPUT ${LEXER_FILES}
-	COMMAND flex -o "${ZMAP_SOURCE_DIR}/lexer.c" --header-file="${ZMAP_SOURCE_DIR}/lexer.h" "${ZMAP_SOURCE_DIR}/lexer.l"
-)
-
-add_custom_command(OUTPUT ${PARSER_FILES}
-	COMMAND byacc -d -o "${ZMAP_SOURCE_DIR}/parser.c" "${ZMAP_SOURCE_DIR}/parser.y"
-)
-
 add_executable(zmap ${ZMAP_MAIN} ${SOURCES} ${ZOPT_FILES} ${LEXER_FILES} ${PARSER_FILES})
 
-#add_dependencies(zmap generated_code)
+SET(ZMAP_LIBS pcap gmp m ${REDIS_LIBS} ${JSON_LIBRARIES})
 
 target_link_libraries(
 	zmap 
-	pcap gmp m
-	${REDIS_LIBS}
-	${JSON_LIBRARIES}
+	${ZMAP_LIBS}
 )
+
+if(ENABLE_TEST)
+	# Unit test sources
+	SET(TEST_MODULE_SOURCES
+		"${TEST_SOURCE_DIR}/util_test.c"
+	)
+
+	# Unit test runner
+	SET(TEST_SOURCES
+		"${TEST_SOURCE_DIR}/test_main.c"
+		${TEST_MODULE_SOURCES}
+	)
+	# Unit test executable
+	add_executable(zmap-unit-test EXCLUDE_FROM_ALL ${SOURCES} ${TEST_SOURCES} ${ZOPT_FILES} ${LEXER_FILES} ${PARSER_FILES})
+	target_link_libraries(
+		zmap-unit-test
+		${CHECK_LIBRARIES}
+		${ZMAP_LIBS}
+	)
+
+
+	# All unit tests (check test) as a single CTest
+	add_test(unit-tests zmap-unit-test)
+
+	# Integration test executables would go here
+	#add_executable(integrations-tests EXCLUDE_FROM_ALL ...)
+
+	# Integration tests would go here
+	#add_test(integration-tests)
+
+	# Make make check work like autotools
+	add_dependencies(check zmap-unit-test)
+endif()
 
 # Install binary
 install(
