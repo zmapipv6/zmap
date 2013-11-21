@@ -106,7 +106,7 @@ struct state_send {
 	int complete;
 	uint32_t first_scanned;
 	uint32_t targets;
-	uint32_t sendto_failures;
+	uint32_t sendto_failures; 
 };
 extern struct state_send zsend;
 

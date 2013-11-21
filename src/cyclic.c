@@ -244,3 +244,8 @@ uint32_t cyclic_get_next_ip(cyclic_t* c)
 	}
 }
 
+void cyclic_free(cyclic_t *c)
+{
+	free(c);
+}
+

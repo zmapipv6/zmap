@@ -27,6 +27,7 @@
 #include "../lib/logger.h"
 #include "../lib/random.h"
 #include "../lib/blacklist.h"
+#include "../lib/xalloc.h"
 
 #include "cyclic.h"
 #include "state.h"
@@ -49,15 +50,23 @@ static in_addr_t srcip_last;
 // in order to help prevent cross-scan interference
 static uint32_t srcip_offset;
 
-static cyclic_t* cycle;
+static cyclic_t** cycles;
+static int num_cycles;
+static int cycle_index;
 
 // global sender initialize (not thread specific)
 int send_init(void)
 {
+	int i;
 	// generate a new primitive root and starting position
-	cycle = cyclic_init(0, 0);
-	assert(cycle);
-	zsend.first_scanned = cyclic_get_curr_ip(cycle);
+	num_cycles = zconf.target_ports_len;
+	cycles = xmalloc(num_cycles * sizeof(cyclic_t*));
+	for (i = 0; i < num_cycles; ++i) {
+		cycles[i] = cyclic_init(0, 0);
+		assert(cycles[i]);
+	}
+	cycle_index = 0;
+	zsend.first_scanned = cyclic_get_curr_ip(cycles[0]);
 
 	// compute number of targets
 	uint64_t allowed = blacklist_count_allowed();
@@ -273,7 +282,8 @@ int send_run(int sock)
 			pthread_mutex_unlock(&send_mutex);
 			break;
 		}
-		uint32_t curr = cyclic_get_next_ip(cycle);
+		uint32_t curr = cyclic_get_next_ip(cycles[cycle_index++]);
+		cycle_index %= num_cycles;
 		if (curr == zsend.first_scanned) {
 			zsend.complete = 1;
 			zsend.finish = now();
