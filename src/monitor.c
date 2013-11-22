@@ -141,6 +141,14 @@ double compute_remaining_time(double age)
 
 static void monitor_update(void)
 {
+	uint64_t total_failures = 0;
+	uint64_t total_sent = 0;
+	int complete = 1;
+	for (uint16_t i = 0; i < zconf.target_ports_len; ++i) {
+		total_failures += zsend[i].sendto_failures;
+		total_sent += zsend[i].sent;
+		complete &= zsend[i].complete;
+	}
 	if (last_now > 0.0) {
 		double age = now() - zsend[0].start;
 		double delta = now() - last_now;
@@ -183,31 +191,31 @@ static void monitor_update(void)
 		}	
 
 		// Warn if we fail to send > 1% of our average send rate
-		uint32_t fail_rate = (uint32_t)((zsend.sendto_failures - last_failures) / delta); // failures/sec
-		if (fail_rate > ((zsend.sent / age) / 100)) {
+		uint32_t fail_rate = (uint32_t)((total_failures - last_failures) / delta); // failures/sec
+		if (fail_rate > ((total_sent / age) / 100)) {
 			log_warn("monitor", "Failed to send %d packets/sec (%d total failures)",
-					 fail_rate, zsend.sendto_failures);
+					 fail_rate, total_failures);
 		}
 		float hits;
-		if (!zsend.sent) {
+		if (!total_sent) {
 			hits = 0;
 		} else {
-			hits = zrecv.success_unique*100./zsend.sent;
+			hits = zrecv.success_unique*100.0/total_sent;
 		}
-		if (!zsend.complete) {
+		if (!complete) {
 			// main display (during sending)
-			number_string((zsend.sent - last_sent)/delta,
+			number_string((total_sent - last_sent)/delta,
 							send_rate, sizeof(send_rate));
-			number_string((zsend.sent/age), send_avg, sizeof(send_avg));
+			number_string((total_sent/age), send_avg, sizeof(send_avg));
 			fprintf(stderr,
-					"%5s %0.0f%%%s; send: %u %sp/s (%sp/s avg); "
+					"%5s %0.0f%%%s; send: %lu %sp/s (%sp/s avg); "
 					"recv: %u %sp/s (%sp/s avg); "
 					"drops: %sp/s (%sp/s avg); "
 					"hits: %0.2f%%\n", 
 					time_past,
 					percent_complete,
 					time_left,
-					zsend.sent,
+					total_sent,
 					send_rate,
 					send_avg,
 					zrecv.success_unique,
@@ -218,16 +226,18 @@ static void monitor_update(void)
 					hits);
 		} else {
 		  	// alternate display (during cooldown)
-			number_string((zsend.sent/(zsend.finish - zsend.start)), send_avg, sizeof(send_avg));
+		  	uint16_t num_ports = zconf.target_ports_len;
+		  	double runtime = zsend[num_ports - 1].finish - zsend[num_ports - 1].start;
+			number_string((total_sent/runtime), send_avg, sizeof(send_avg));
 			fprintf(stderr, 
-					"%5s %0.0f%%%s; send: %u done (%sp/s avg); "
+					"%5s %0.0f%%%s; send: %lu done (%sp/s avg); "
 					"recv: %u %sp/s (%sp/s avg); "
 					"drops: %sp/s (%sp/s avg); "
 					"hits: %0.2f%%\n", 
 					time_past,
 					percent_complete,
 					time_left,
-					zsend.sent,
+					total_sent,
 					send_avg,
 					zrecv.success_unique,
 					recv_rate,
@@ -238,15 +248,20 @@ static void monitor_update(void)
 		}
 	}
 	last_now  = now();
-	last_sent = zsend.sent;
+	last_sent = total_sent;
 	last_rcvd = zrecv.success_unique;
 	last_drop = zrecv.pcap_drop + zrecv.pcap_ifdrop;
-	last_failures = zsend.sendto_failures;
+	last_failures = total_failures;
 }
 
 void monitor_run(void)
 {
-	while (!(zsend.complete && zrecv.complete))  {
+	int complete = 1;
+	complete &= zrecv.complete;
+	for (uint16_t i = 0; complete && i < zconf.target_ports_len; ++i) {
+		complete &= zsend[i].complete;
+	}
+	while (!(complete))  {
 		monitor_update();
 		sleep(UPDATE_INTERVAL);
 	}
