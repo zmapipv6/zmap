@@ -16,6 +16,7 @@
 #include "types.h"
 #include "fieldset.h"
 #include "filter.h"
+#include "cyclic.h"
 
 #ifndef STATE_H
 #define STATE_H
@@ -37,7 +38,7 @@ struct fieldset_conf {
 struct state_conf {
 	int log_level;
 	char* target_ports_str;
-	int target_ports_len;
+	uint16_t target_ports_len;
 	port_h_t *target_ports;
 	port_h_t source_port_first;
 	port_h_t source_port_last;
@@ -102,13 +103,16 @@ struct state_send {
 	double start;
 	double finish;
 	uint32_t sent;
-	uint32_t blacklisted;
 	int complete;
 	uint32_t first_scanned;
 	uint32_t targets;
-	uint32_t sendto_failures; 
+	uint32_t sendto_failures;
+	cyclic_t *cycle;
+	pthread_mutex_t lock;
 };
-extern struct state_send zsend;
+
+// Keep state per port
+extern struct state_send* zsend;
 
 // global receiver stats
 struct state_recv {

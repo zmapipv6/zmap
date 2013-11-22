@@ -102,32 +102,50 @@ static void number_string(uint32_t n, char *buf, size_t len)
 // estimate time remaining time based on config and state
 double compute_remaining_time(double age)
 {
-	if (!zsend.complete) {
+	int complete = 1;
+	uint16_t num_ports = zconf.target_ports_len;
+	for (uint32_t i = 0; complete && i < num_ports; ++i) {
+		complete &= zsend[i].complete;
+	}
+
+	if (!complete) {
 		double remaining[] = {INFINITY, INFINITY, INFINITY};
-		if (zsend.targets) {
-			double done = (double)zsend.sent/zsend.targets;
-			remaining[0] = (1. - done)*(age/done) + zconf.cooldown_secs;
+
+		// Calculate based on targets remaining over total targets
+		double done = 0.0;
+		for (uint16_t i = 0; i < num_ports; ++i) {
+			if (zsend[i].targets) {
+				done += (double) zsend[i].sent/zsend[i].targets;
+			}
 		}
+		done /= num_ports;
+		remaining[0] = (1.0 - done)*(age/done) + zconf.cooldown_secs;
+
+		// Calculate remaining of max runtime
 		if (zconf.max_runtime) {
 			remaining[1] = (zconf.max_runtime - age)+zconf.cooldown_secs;
 		}
+
+		// Calculate based on percentage of total results
 		if (zconf.max_results) {
-			double done = (double)zrecv.success_unique/zconf.max_results;
-			remaining[2] = (1. - done)*(age/done);
+			double done = (double) zrecv.success_unique/zconf.max_results;
+			remaining[2] = (1.0 - done)*(age/done);
 		}
+
 		return min_d(remaining, sizeof(remaining)/sizeof(double));
 	} else {
-		return zconf.cooldown_secs - (now() - zsend.finish);
+		// XXX Actually figure out which one finished last?
+		return zconf.cooldown_secs - (now() - zsend[num_ports - 1].finish);
 	}
 }
 
 static void monitor_update(void)
 {
 	if (last_now > 0.0) {
-		double age = now() - zsend.start;
+		double age = now() - zsend[0].start;
 		double delta = now() - last_now;
 		double remaining_secs = compute_remaining_time(age);
-		double percent_complete = 100.*age/(age + remaining_secs);
+		double percent_complete = 100.0*age/(age + remaining_secs);
 
 		// ask pcap for fresh values
 		recv_update_pcap_stats();

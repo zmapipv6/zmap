@@ -24,6 +24,9 @@ uint32_t cyclic_get_curr_ip(cyclic_t *);
 // what primitive root was generated for this current scan
 uint32_t cyclic_get_primroot(cyclic_t *);
 
+// how many IPs were blacklisted
+uint32_t cyclic_get_blacklisted(cyclic_t *);
+
 void cyclic_free(cyclic_t *);
 
 #endif

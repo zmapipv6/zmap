@@ -110,46 +110,49 @@ static void *start_mon(__attribute__((unused)) void *arg)
 
 static void summary(void)
 {
-	char send_start_time[STRTIME_LEN+1];
-	assert(dstrftime(send_start_time, STRTIME_LEN, "%c", zsend.start));
-	char send_end_time[STRTIME_LEN+1];
-	assert(dstrftime(send_end_time, STRTIME_LEN, "%c", zsend.finish));
-	char recv_start_time[STRTIME_LEN+1];
-	assert(dstrftime(recv_start_time, STRTIME_LEN, "%c", zrecv.start));
-	char recv_end_time[STRTIME_LEN+1];
-	assert(dstrftime(recv_end_time, STRTIME_LEN, "%c", zrecv.finish));
-	double hitrate = ((double) 100 * zrecv.success_unique)/((double)zsend.sent);
+	for (uint32_t i = 0; i < zconf.target_ports_len; ++i) {
+		char send_start_time[STRTIME_LEN+1];
+		assert(dstrftime(send_start_time, STRTIME_LEN, "%c", zsend[i].start));
+		char send_end_time[STRTIME_LEN+1];
+		assert(dstrftime(send_end_time, STRTIME_LEN, "%c", zsend[i].finish));
+		char recv_start_time[STRTIME_LEN+1];
+		assert(dstrftime(recv_start_time, STRTIME_LEN, "%c", zrecv.start));
+		char recv_end_time[STRTIME_LEN+1];
+		assert(dstrftime(recv_end_time, STRTIME_LEN, "%c", zrecv.finish));
+		double hitrate = (100.0 * zrecv.success_unique) / 
+				((double) zsend[i].sent);
 
-	SS("cnf", "target-port", zconf.target_ports_str);
-	SU("cnf", "source-port-range-begin", zconf.source_port_first);
-	SU("cnf", "source-port-range-end", zconf.source_port_last);
-	SS("cnf", "source-addr-range-begin", zconf.source_ip_first);
-	SS("cnf", "source-addr-range-end", zconf.source_ip_last);
-	SU("cnf", "maximum-targets", zconf.max_targets);
-	SU("cnf", "maximum-runtime", zconf.max_runtime);
-	SU("cnf", "maximum-results", zconf.max_results);
-	SU("cnf", "permutation-seed", zconf.seed);
-	SI("cnf", "cooldown-period", zconf.cooldown_secs);
-	SS("cnf", "send-interface", zconf.iface);
-	SI("cnf", "rate", zconf.rate);
-	SLU("cnf", "bandwidth", zconf.bandwidth);
-	SU("env", "nprocessors", (unsigned) sysconf(_SC_NPROCESSORS_ONLN));
-	SS("exc", "send-start-time", send_start_time);
-	SS("exc", "send-end-time", send_end_time);
-	SS("exc", "recv-start-time", recv_start_time);
-	SS("exc", "recv-end-time", recv_end_time);
-	SU("exc", "sent", zsend.sent);
-	SU("exc", "blacklisted", zsend.blacklisted);
-	SU("exc", "first-scanned", zsend.first_scanned);
-	SD("exc", "hit-rate", hitrate);
-	SU("exc", "success-total", zrecv.success_total);
-	SU("exc", "success-unique", zrecv.success_unique);
-	SU("exc", "success-cooldown-total", zrecv.cooldown_total);
-	SU("exc", "success-cooldown-unique", zrecv.cooldown_unique);
-	SU("exc", "failure-total", zrecv.failure_total);
-	SU("exc", "sendto-failures", zsend.sendto_failures);
-	SU("adv", "permutation-gen", zconf.generator);
-	SS("exc", "scan-type", zconf.probe_module->name);
+		SU("cnf", "target-port", zconf.target_ports[i]);
+		SU("cnf", "source-port-range-begin", zconf.source_port_first);
+		SU("cnf", "source-port-range-end", zconf.source_port_last);
+		SS("cnf", "source-addr-range-begin", zconf.source_ip_first);
+		SS("cnf", "source-addr-range-end", zconf.source_ip_last);
+		SU("cnf", "maximum-targets", zconf.max_targets);
+		SU("cnf", "maximum-runtime", zconf.max_runtime);
+		SU("cnf", "maximum-results", zconf.max_results);
+		SU("cnf", "permutation-seed", zconf.seed);
+		SI("cnf", "cooldown-period", zconf.cooldown_secs);
+		SS("cnf", "send-interface", zconf.iface);
+		SI("cnf", "rate", zconf.rate);
+		SLU("cnf", "bandwidth", zconf.bandwidth);
+		SU("env", "nprocessors", (unsigned) sysconf(_SC_NPROCESSORS_ONLN));
+		SS("exc", "send-start-time", send_start_time);
+		SS("exc", "send-end-time", send_end_time);
+		SS("exc", "recv-start-time", recv_start_time);
+		SS("exc", "recv-end-time", recv_end_time);
+		SU("exc", "sent", zsend[i].sent);
+		SU("exc", "blacklisted", cyclic_get_blacklisted(zsend[i].cycle));
+		SU("exc", "first-scanned", zsend[i].first_scanned);
+		SD("exc", "hit-rate", hitrate);
+		SU("exc", "success-total", zrecv.success_total);
+		SU("exc", "success-unique", zrecv.success_unique);
+		SU("exc", "success-cooldown-total", zrecv.cooldown_total);
+		SU("exc", "success-cooldown-unique", zrecv.cooldown_unique);
+		SU("exc", "failure-total", zrecv.failure_total);
+		SU("exc", "sendto-failures", zsend[i].sendto_failures);
+		SU("adv", "permutation-gen", zconf.generator);
+		SS("exc", "scan-type", zconf.probe_module->name);
+	}
 }
 
 static void start_zmap(void)
@@ -207,7 +210,7 @@ static void start_zmap(void)
 		exit(EXIT_FAILURE);
 	}
 	if (zconf.output_module && zconf.output_module->start) {
-		zconf.output_module->start(&zconf, &zsend, &zrecv);
+		zconf.output_module->start(&zconf, zsend, &zrecv);
 	}
 	// start threads
 	pthread_t *tsend, trecv, tmon;
@@ -277,10 +280,10 @@ static void start_zmap(void)
 		summary();
 	}
 	if (zconf.output_module && zconf.output_module->close) {
-		zconf.output_module->close(&zconf, &zsend, &zrecv);
+		zconf.output_module->close(&zconf, zsend, &zrecv);
 	}
 	if (zconf.probe_module && zconf.probe_module->close) {
-		zconf.probe_module->close(&zconf, &zsend, &zrecv);
+		zconf.probe_module->close(&zconf, zsend, &zrecv);
 	}
 	log_info("zmap", "completed");
 }

@@ -70,6 +70,7 @@ struct cyclic {
 	uint64_t primroot;
 	uint64_t current;
 	uint64_t num_addrs;
+	uint32_t num_blacklisted;
 	const cyclic_group_t *group;
 };
 
@@ -214,17 +215,17 @@ cyclic_t* cyclic_init(uint32_t primroot_, uint32_t current_)
 	return 0;
 }
 
-uint32_t cyclic_get_curr_ip(cyclic_t* c)
+uint32_t cyclic_get_curr_ip(cyclic_t *c)
 {
 	return (uint32_t) blacklist_lookup_index(c->current - 1);
 }
 
-uint32_t cyclic_get_primroot(cyclic_t* c)
+uint32_t cyclic_get_primroot(cyclic_t *c)
 {
 	return (uint32_t) c->primroot;
 }
 
-static inline uint32_t cyclic_get_next_elem(cyclic_t* c)
+static inline uint32_t cyclic_get_next_elem(cyclic_t *c)
 {
 	do {
 		c->current *= c->primroot;
@@ -233,15 +234,20 @@ static inline uint32_t cyclic_get_next_elem(cyclic_t* c)
 	return (uint32_t) c->current;
 }
 
-uint32_t cyclic_get_next_ip(cyclic_t* c)
+uint32_t cyclic_get_next_ip(cyclic_t  *c)
 {
 	while (1) {
 		uint32_t candidate = cyclic_get_next_elem(c);
 		if (candidate-1 < c->num_addrs) {
 			return blacklist_lookup_index(candidate-1);
 		}
-		zsend.blacklisted++;
+		c->num_blacklisted++;
 	}
+}
+
+uint32_t cyclic_get_blacklisted(cyclic_t *c)
+{
+	return c->num_blacklisted;
 }
 
 void cyclic_free(cyclic_t *c)

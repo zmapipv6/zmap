@@ -35,9 +35,6 @@
 #include "probe_modules/probe_modules.h"
 #include "validate.h"
 
-
-// lock to manage access to share send state (e.g. counters and cyclic)
-pthread_mutex_t send_mutex = PTHREAD_MUTEX_INITIALIZER;
 // lock to provide thread safety to the user provided send callback
 pthread_mutex_t syncb_mutex = PTHREAD_MUTEX_INITIALIZER;
 

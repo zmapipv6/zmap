@@ -46,7 +46,8 @@ void split_string(const char* in, int *len, char***results)
         *len = retvlen;
 }
 
-void parse_ranges(char **in, int in_len, port_h_t **ports, int *ports_len)
+void parse_ranges(char **in, int in_len, port_h_t **ports,
+		uint16_t *ports_len)
 {
 	int i, p = 0;
 	port_h_t port;
