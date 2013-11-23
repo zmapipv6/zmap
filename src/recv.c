@@ -48,7 +48,7 @@ static pcap_t *pc = NULL;
 // bitmap of observed IP addresses
 static uint64_t **seen = NULL;
 
-static u_char fake_eth_hdr[65535];
+static u_char fake_eth_hdr[0xFFFF];
 
 void packet_cb(u_char __attribute__((__unused__)) *user,
 		const struct pcap_pkthdr *p, const u_char *bytes)
