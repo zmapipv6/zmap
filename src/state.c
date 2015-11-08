@@ -30,6 +30,7 @@ struct state_conf zconf = {
 	.packet_streams = 1,
 	.seed_provided = 0,
 	.seed = 0,
+	.resume_idx = 0,
 	.output_module = NULL,
 	.output_args = NULL,
 	.probe_module = NULL,

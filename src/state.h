@@ -69,6 +69,7 @@ struct state_conf {
 	// a random seed.
 	int seed_provided;
 	uint64_t seed;
+	uint32_t resume_idx;
 	aesrand_t *aes;
 	// generator of the cyclic multiplicative group that is utilized for
 	// address generation

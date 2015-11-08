@@ -43,7 +43,8 @@ void shard_init(shard_t* shard,
 		uint8_t num_subshard,
 		const cycle_t* cycle,
 		shard_complete_cb cb,
-		void *arg);
+		void *arg,
+		uint32_t resume_idx);
 
 uint32_t shard_get_cur_ip(shard_t *shard);
 uint32_t shard_get_next_ip(shard_t *shard);

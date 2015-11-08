@@ -57,7 +57,7 @@ void shard_complete(uint8_t thread_id, void *arg)
 }
 
 iterator_t* iterator_init(uint8_t num_threads, uint8_t shard,
-			  uint8_t num_shards)
+			  uint8_t num_shards, uint32_t resume_idx)
 {
 	uint64_t num_addrs = blacklist_count_allowed();
 	iterator_t *it = xmalloc(sizeof(struct iterator));
@@ -81,9 +81,10 @@ iterator_t* iterator_init(uint8_t num_threads, uint8_t shard,
 			   num_threads,
 			   &it->cycle,
 			   shard_complete,
-			   it
-			   );
+			   it,
+			   resume_idx
 
+		);
 	}
 	zconf.generator = it->cycle.generator;
 	return it;

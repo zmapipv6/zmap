@@ -23,7 +23,8 @@ void shard_init(shard_t* shard,
 		uint8_t num_subshards,
 		const cycle_t* cycle,
 		shard_complete_cb cb,
-		void *arg)
+		void *arg,
+		uint32_t resume_idx)
 {
 	// Start out by figuring out the multiplication factor for this shard.
 	// With one shard, this would just be the generator, but with n shards,
@@ -33,6 +34,9 @@ void shard_init(shard_t* shard,
 	// thread. With t threads, f = g^(nr).
 	//
 	// tot_shards = nr
+	if (resume_idx) {
+		assert(shard_id == 0);
+	}
 	uint32_t tot_shards = (uint32_t) num_shards * (uint32_t) num_subshards;
 	uint64_t num_elts = cycle->group->prime - 1;
 	mpz_t start, generator, prime, result, power;
@@ -63,7 +67,11 @@ void shard_init(shard_t* shard,
 	shard->params.last = (uint64_t) mpz_get_ui(result);
 	shard->params.last *= cycle->offset;
 	shard->params.last %= shard->params.modulus;
-	shard->current = shard->params.first;
+	if (resume_idx) {
+		shard->current = resume_idx;
+	} else {
+		shard->current = shard->params.first;
+	}
 	// Handle scanning a sample
 	if (zsend.targets != zsend.max_index) {
 		shard->state.max_targets = zsend.targets / num_subshards;

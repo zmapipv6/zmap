@@ -20,7 +20,7 @@
 typedef struct iterator iterator_t;
 
 iterator_t* iterator_init(uint8_t num_threads, uint8_t shard,
-			  uint8_t num_shards);
+			  uint8_t num_shards, uint32_t resume_idx);
 
 uint32_t iterator_get_sent(iterator_t *it);
 

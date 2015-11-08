@@ -885,13 +885,30 @@ int main(int argc, char *argv[])
 				strerror(errno));
 	}
 #endif
-
 	// resume scan if requested
+	if (args.resume_scan_from_given) {
+		// we can only resume a scan if there's a single thread.
+		// and we know the correct seed.
+		if (zconf.seed_provided) {
+			log_fatal("zmap", "a scan can only be resumed from a seed");
+		}
+		if (zconf.senders > 1) {
+			log_fatal("zmap", "resume can only be used if BOTH the original "
+					"and current scan had a single thread.");
+		}
+		// figure out blacklist index if the last seen IP address
+		struct in_addr addr;
+		uint32_t resume_from_ip;
+		if (!inet_aton(args.resume_scan_from_arg, &addr)) {
+			// inet_aton() returns nonzero if the address is valid, zero if not.
+			log_fatal("zmap", "invalid IP provided for --resume-scan-from");
+		}
+		resume_from_ip = addr.s_addr;
+		zconf.resume_idx = blacklist_ip_to_index(resume_from_ip);
+	}
 
 	start_zmap();
-
 	fclose(log_location);
-
 	cmdline_parser_free(&args);
 	free(params);
 	return EXIT_SUCCESS;

@@ -65,7 +65,8 @@ iterator_t* send_init(void)
 {
 	// generate a new primitive root and starting position
 	iterator_t *it;
-	it = iterator_init(zconf.senders, zconf.shard_num, zconf.total_shards);
+	it = iterator_init(zconf.senders, zconf.shard_num, zconf.total_shards,
+			zconf.resume_idx);
 
 	// process the dotted-notation addresses passed to ZMAP and determine
 	// the source addresses from which we'll send packets;
