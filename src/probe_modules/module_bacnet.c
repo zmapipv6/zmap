@@ -25,7 +25,7 @@ probe_module_t module_bacnet;
 
 static int num_ports;
 
-static uint8_t bacnet_body[] = { 0x0c, 0x02, 0x3f, 0xff, 0xff, 0x19, 0x4b, 00 };
+static uint8_t bacnet_body[] = { 0x0c, 0x02, 0x3f, 0xff, 0xff, 0x19, 0x4b, 0x00 };
 #define BACNET_BODY_LEN 8
 
 int bacnet_make_packet(void *buf, ipaddr_n_t src_ip, ipaddr_n_t dst_ip,
@@ -39,13 +39,13 @@ int bacnet_make_packet(void *buf, ipaddr_n_t src_ip, ipaddr_n_t dst_ip,
 
         ip_header->ip_src.s_addr = src_ip;
         ip_header->ip_dst.s_addr = dst_ip;
-        udp_header->uh_sport = htons(get_src_port(num_ports, probe_num, validation));
         ip_header->ip_sum = 0;
-        ip_header->ip_sum = zmap_ip_checksum((unsigned short *) ip_header);
+
+        udp_header->uh_sport = htons(get_src_port(num_ports, probe_num, validation));
 
         bnp->vlc.type = ZMAP_BACNET_TYPE_IP;
         bnp->vlc.function = ZMAP_BACNET_FUNCTION_UNICAST_NPDU;
-        bnp->vlc.length = 0x11;
+        bnp->vlc.length = htons(0x11);
 
         bnp->npdu.version = ZMAP_BACNET_NPDU_VERSION_ASHRAE_135_1995;
         bnp->npdu.control = 0x04;
@@ -56,13 +56,15 @@ int bacnet_make_packet(void *buf, ipaddr_n_t src_ip, ipaddr_n_t dst_ip,
         bnp->apdu.server_choice = 0x0c;
         memcpy(body, bacnet_body, BACNET_BODY_LEN);
 
+        ip_header->ip_sum = zmap_ip_checksum((unsigned short *) ip_header);
+
         return EXIT_SUCCESS;
 }
 
 int bacnet_validate_packet(const struct ip *ip_hdr, uint32_t len,
                 uint32_t *src_ip, uint32_t *validation)
 {
-	if (!udp_validate_packet(ip_hdr, len, src_ip, validation)) {
+	if (!udp_do_validate_packet(ip_hdr, len, src_ip, validation, num_ports)) {
 		return 0;
 	}
         if (ip_hdr->ip_p ==  IPPROTO_UDP) {
@@ -117,6 +119,11 @@ void bacnet_process_packet(const u_char *packet,
        }
 }
 
+int bacnet_global_initialize(struct state_conf *conf) {
+	num_ports = conf->source_port_last - conf->source_port_first + 1;
+	return EXIT_SUCCESS;
+}
+
 int bacnet_init_perthread(void *buf, macaddr_t *src,
 		macaddr_t *gw, __attribute__((unused)) port_h_t dst_port,
 		void **arg)
@@ -127,9 +134,9 @@ int bacnet_init_perthread(void *buf, macaddr_t *src,
         struct udphdr *udp_header = (struct udphdr*)(&ip_header[1]);
         make_eth_header(eth_header, src, gw);
 
-        uint16_t ip_len = htons(sizeof(struct ip) + sizeof(struct udphdr) + 0x11);
+        uint16_t ip_len = sizeof(struct ip) + sizeof(struct udphdr) + 0x11;
         assert(ip_len <= MAX_PACKET_SIZE);
-        make_ip_header(ip_header, IPPROTO_UDP, ip_len);
+        make_ip_header(ip_header, IPPROTO_UDP, htons(ip_len));
 
         uint16_t udp_len = sizeof(struct udphdr) + 0x11;
         make_udp_header(udp_header, zconf.target_port, udp_len);
@@ -154,12 +161,12 @@ static fielddef_t fields[] = {
 
 probe_module_t module_bacnet = {
         .name = "bacnet",
-        .packet_length = 0x11,
+        .packet_length = sizeof(struct ether_header) + sizeof(struct ip) + sizeof(struct udphdr) + 0x11,
         .pcap_filter = "udp || icmp",
         .pcap_snaplen = 1500,
         .port_args = 1,
         .thread_initialize = &bacnet_init_perthread,
-        .global_initialize = &udp_global_initialize,
+        .global_initialize = &bacnet_global_initialize,
         .make_packet = &bacnet_make_packet,
         .print_packet = &udp_print_packet,
         .validate_packet = &bacnet_validate_packet,
