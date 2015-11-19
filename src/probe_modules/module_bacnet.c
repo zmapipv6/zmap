@@ -25,8 +25,8 @@ probe_module_t module_bacnet;
 
 static int num_ports;
 
-static uint8_t bacnet_body[] = { 0x0c, 0x02, 0x3f, 0xff, 0xff, 0x19, 0x4b, 0x00 };
-#define BACNET_BODY_LEN 8
+static uint8_t bacnet_body[] = { 0x0c, 0x02, 0x3f, 0xff, 0xff, 0x19, 0x4b };
+#define BACNET_BODY_LEN 7
 
 int bacnet_make_packet(void *buf, ipaddr_n_t src_ip, ipaddr_n_t dst_ip,
                 uint32_t *validation, int probe_num, void *arg)
