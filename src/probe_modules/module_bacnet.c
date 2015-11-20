@@ -28,6 +28,11 @@ static int num_ports;
 static uint8_t bacnet_body[] = { 0x0c, 0x02, 0x3f, 0xff, 0xff, 0x19, 0x4b };
 #define BACNET_BODY_LEN 7
 
+static inline uint8_t get_invoke_id(uint32_t *validation)
+{
+	return (uint8_t) ((validation[1] >> 24) & 0xFF);
+}
+
 int bacnet_make_packet(void *buf, ipaddr_n_t src_ip, ipaddr_n_t dst_ip,
                 uint32_t *validation, int probe_num, void *arg)
 {
@@ -52,7 +57,7 @@ int bacnet_make_packet(void *buf, ipaddr_n_t src_ip, ipaddr_n_t dst_ip,
 
         bnp->apdu.type_flags = 0x00;
         bnp->apdu.max_segments_apdu = 0x05;
-        bnp->apdu.invoke_id = 1;
+        bnp->apdu.invoke_id = get_invoke_id(validation);
         bnp->apdu.server_choice = 0x0c;
         memcpy(body, bacnet_body, BACNET_BODY_LEN);
 
@@ -67,12 +72,23 @@ int bacnet_validate_packet(const struct ip *ip_hdr, uint32_t len,
 	if (!udp_do_validate_packet(ip_hdr, len, src_ip, validation, num_ports)) {
 		return 0;
 	}
+	struct udphdr *udp;
         if (ip_hdr->ip_p ==  IPPROTO_UDP) {
-        	struct udphdr *udp = (struct udphdr *) ((char *) ip_hdr + ip_hdr->ip_hl * 4);
+        	udp = (struct udphdr *) ((char *) ip_hdr + ip_hdr->ip_hl * 4);
         	uint16_t sport = ntohs(udp->uh_sport);
 		if (sport != zconf.target_port) {
 			return 0;
 		}
+	}
+	if (udp->uh_ulen < sizeof(struct udphdr)) {
+		return 0;
+	}
+	if (udp->uh_ulen - 8 < sizeof(struct bacnet_vlc)) {
+		return 0;
+	}
+	struct bacnet_vlc *vlc = (struct bacnet_vlc *) &udp[1];
+	if (vlc->type != ZMAP_BACNET_TYPE_IP) {
+		return 0;
 	}
 	return 1;
 }
