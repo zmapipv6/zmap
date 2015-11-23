@@ -83,7 +83,7 @@ int bacnet_validate_packet(const struct ip *ip_hdr, uint32_t len,
 	if (udp->uh_ulen < sizeof(struct udphdr)) {
 		return 0;
 	}
-	if (udp->uh_ulen - 8 < sizeof(struct bacnet_vlc)) {
+	if (udp->uh_ulen < sizeof(struct udphdr) + sizeof(struct bacnet_vlc)) {
 		return 0;
 	}
 	struct bacnet_vlc *vlc = (struct bacnet_vlc *) &udp[1];
@@ -93,14 +93,16 @@ int bacnet_validate_packet(const struct ip *ip_hdr, uint32_t len,
 	return 1;
 }
 
-void bacnet_process_packet(const u_char *packet,
-		__attribute__((unused)) uint32_t len, fieldset_t *fs,
+void bacnet_process_packet(const u_char *packet, uint32_t len, fieldset_t *fs,
         __attribute__((unused)) uint32_t *validation)
 {
-        struct ip *ip_hdr = (struct ip*) &packet[sizeof(struct ether_header)];
+	uint32_t ip_offset = sizeof(struct ether_header);
+        struct ip *ip_hdr = (struct ip*) &packet[ip_offset];
 
         if (ip_hdr->ip_p == IPPROTO_UDP) {
-                struct udphdr *udp = (struct udphdr*) ((char *) ip_hdr + ip_hdr->ip_hl * 4);
+		uint32_t udp_offset = ip_offset + ip_hdr->ip_hl * 4;
+		assert(udp_offset + sizeof(struct udphdr) < len);
+                struct udphdr *udp = (struct udphdr*) &packet[udp_offset];
                 fs_add_string(fs, "classification", (char*) "ntp", 0);
                 fs_add_uint64(fs, "success", 1);
                 fs_add_uint64(fs, "sport", ntohs(udp->uh_sport));
@@ -110,29 +112,82 @@ void bacnet_process_packet(const u_char *packet,
                 fs_add_null(fs, "icmp_code");
                 fs_add_null(fs, "icmp_unreach_str");
 
-        } else if (ip_hdr->ip_p ==  IPPROTO_ICMP) {
-               struct icmp *icmp = (struct icmp *) ((char *) ip_hdr + ip_hdr -> ip_hl * 4);
-               struct ip *ip_inner = (struct ip *) ((char*) icmp + ICMP_UNREACH_HEADER_SIZE);
+		uint32_t payload_offset = udp_offset + sizeof(struct udphdr);
+		assert(payload_offset < len);
+		const uint8_t *payload = &packet[payload_offset];
+		uint32_t payload_len = len - payload_offset;
+		fs_add_binary(fs, "udp_payload", payload_len, payload, 0);
 
-               fs_modify_string(fs, "saddr", make_ip_str(ip_inner->ip_dst.s_addr), 1);
-               fs_add_string(fs, "classification", (char*) "icmp-unreach", 0);
-               fs_add_uint64(fs, "success", 0);
-               fs_add_null(fs, "sport");
-               fs_add_null(fs, "dport");
-               fs_add_string(fs, "icmp_responder", make_ip_str(ip_hdr->ip_src.s_addr), 1);
-               fs_add_uint64(fs, "icmp_type", icmp->icmp_type);
-               fs_add_uint64(fs, "icmp_code", icmp->icmp_code);
-               fs_add_null(fs, "icmp_unreach_str");
-       } else {
-               fs_add_string(fs, "classification", (char *) "other", 0);
-               fs_add_uint64(fs, "success", 0);
-               fs_add_null(fs, "sport");
-               fs_add_null(fs, "dport");
-               fs_add_null(fs, "icmp_responder");
-               fs_add_null(fs, "icmp_type");
-               fs_add_null(fs, "icmp_code");
-               fs_add_null(fs, "icmp_unreach_str");
-       }
+		// Pull out the BACNet Device ID
+		uint32_t device_id = 0;
+		int bad_bacnet = 0;
+		if (payload_len < sizeof(struct bacnet_vlc)
+				+ sizeof(struct bacnet_npdu)
+				+ sizeof(struct bacnet_apdu)) {
+			bad_bacnet = 1;
+			goto fail;
+		}
+		struct bacnet_vlc *vlc = (struct bacnet_vlc*) payload;
+		uint32_t npdu_offset = payload_offset
+				+ sizeof(struct bacnet_vlc);
+		struct bacnet_npdu *npdu = &packet[npdu_offset];
+		uint32_t apdu_offset = npdu_offset
+				+ sizeof(struct bacnet_npdu);
+		struct bacnet_apdu *apdu = &packet[apdu_offset];
+
+		if (vlc->function != ZMAP_BACNET_FUNCTION_UNICAST_NPDU 
+				|| vlc->length > payload_len) {
+			bad_bacnet = 1;	
+			goto fail;
+		}
+		if (npdu->version != ZMAP_BACNET_NPDU_VERSION_ASHRAE_135_1995
+				|| npdu->control & 0xF8) {
+			bad_bacnet = 1;
+			goto fail;
+		}
+		if ((apdu->type_flags & 0x30) != 0x30) {
+			bad_bacnet = 1;
+			goto fail;
+		}
+		if (apdu->server_choice
+				!= ZMAP_BACNET_SERVER_CHOICE_READ_PROPERTY) {
+			bad_bacnet = 1;
+			goto fail;
+		}
+		
+		fail:
+			if (bad_bacnet) {
+				fs_add_null(fs, "device_id");
+			} else {
+				fs_add_uint64(fs, "device_id", device_id);
+			}
+	} else if (ip_hdr->ip_p ==  IPPROTO_ICMP) {
+		struct icmp *icmp = (struct icmp *) ((char *) ip_hdr + ip_hdr -> ip_hl * 4);
+		struct ip *ip_inner = (struct ip *) ((char*) icmp + ICMP_UNREACH_HEADER_SIZE);
+
+		fs_modify_string(fs, "saddr", make_ip_str(ip_inner->ip_dst.s_addr), 1);
+		fs_add_string(fs, "classification", (char*) "icmp-unreach", 0);
+		fs_add_uint64(fs, "success", 0);
+		fs_add_null(fs, "sport");
+		fs_add_null(fs, "dport");
+		fs_add_string(fs, "icmp_responder", make_ip_str(ip_hdr->ip_src.s_addr), 1);
+		fs_add_uint64(fs, "icmp_type", icmp->icmp_type);
+		fs_add_uint64(fs, "icmp_code", icmp->icmp_code);
+		fs_add_null(fs, "icmp_unreach_str");
+		fs_add_null(fs, "udp_payload");
+		fs_add_uint64(fs, "device_id", 1234);
+	} else {
+		fs_add_string(fs, "classification", (char *) "other", 0);
+		fs_add_uint64(fs, "success", 0);
+		fs_add_null(fs, "sport");
+		fs_add_null(fs, "dport");
+		fs_add_null(fs, "icmp_responder");
+		fs_add_null(fs, "icmp_type");
+		fs_add_null(fs, "icmp_code");
+		fs_add_null(fs, "icmp_unreach_str");
+		fs_add_null(fs, "udp_payload");
+		fs_add_uint64(fs, "device_id", 1234);
+	}
 }
 
 int bacnet_global_initialize(struct state_conf *conf) {
@@ -173,6 +228,8 @@ static fielddef_t fields[] = {
         {.name = "icmp_type", .type = "int", .desc = "icmp message type"},
         {.name = "icmp_code", .type = "int", .desc = "icmp message sub type code"},
         {.name = "icmp_unreach_str", .type = "string", .desc = "for icmp_unreach responses, the string version of icmp_code "},
+	{.name = "udp_payload", .type = "binary", .desc = "UDP payload"},
+	{.name = "device_id", .type = "int", .desc = "BACNet Device ID"},
 };
 
 probe_module_t module_bacnet = {
