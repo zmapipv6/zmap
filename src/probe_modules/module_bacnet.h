@@ -47,6 +47,8 @@ struct __attribute__((__packed__)) bacnet_probe {
 };
 typedef struct bacnet_probe bacnet_probe_t;
 
+typedef struct bacnet_oid bacnet_oid_t;
+
 #define ZMAP_BACNET_TYPE_IP 0x81
 #define ZMAP_BACNET_FUNCTION_UNICAST_NPDU 0x0a
 #define ZMAP_BACNET_NPDU_VERSION_ASHRAE_135_1995 0x01
