@@ -73,7 +73,7 @@ int bacnet_init_perthread(void *buf, macaddr_t *src,
 }
 
 int bacnet_make_packet(void *buf, ipaddr_n_t src_ip, ipaddr_n_t dst_ip,
-				uint32_t *validation, int probe_num, void *arg)
+				uint32_t *validation, int probe_num, UNUSED void *arg)
 {
 	struct ether_header *eth_header = (struct ether_header *) buf;
 	struct ip *ip_header = (struct ip*) (&eth_header[1]);
@@ -145,7 +145,7 @@ void bacnet_process_packet(const u_char *packet, uint32_t len, fieldset_t *fs,
 		assert(payload_offset < len);
 		const uint8_t *payload = &packet[payload_offset];
 		uint32_t payload_len = len - payload_offset;
-		fs_add_binary(fs, "udp_payload", payload_len, payload, 0);
+		fs_add_binary(fs, "udp_payload", payload_len, (void*) payload, 0);
 	} else if (ip_hdr->ip_p ==  IPPROTO_ICMP) {
 		struct icmp *icmp = (struct icmp *) ((char *) ip_hdr + ip_hdr -> ip_hl * 4);
 		struct ip *ip_inner = (struct ip *) ((char*) icmp + ICMP_UNREACH_HEADER_SIZE);
