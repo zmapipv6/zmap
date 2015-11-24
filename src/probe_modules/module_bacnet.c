@@ -42,6 +42,7 @@ int bacnet_init_perthread(void *buf, macaddr_t *src,
 	struct ip *ip_header = (struct ip*)(&eth_header[1]);
 	struct udphdr *udp_header = (struct udphdr*)(&ip_header[1]);
 	struct bacnet_probe *bnp = (struct bacnet_probe*) &udp_header[1];
+	uint8_t *body = (uint8_t*) &bnp[1];
 
 	make_eth_header(eth_header, src, gw);
 
@@ -61,7 +62,6 @@ int bacnet_init_perthread(void *buf, macaddr_t *src,
 
 	bnp->apdu.type_flags = 0x00;
 	bnp->apdu.max_segments_apdu = 0x05;
-	bnp->apdu.invoke_id = get_invoke_id(validation);
 	bnp->apdu.server_choice = 0x0c;
 	memcpy(body, bacnet_body, BACNET_BODY_LEN);
 
@@ -78,7 +78,7 @@ int bacnet_make_packet(void *buf, ipaddr_n_t src_ip, ipaddr_n_t dst_ip,
 	struct ether_header *eth_header = (struct ether_header *) buf;
 	struct ip *ip_header = (struct ip*) (&eth_header[1]);
 	struct udphdr *udp_header = (struct udphdr*) &ip_header[1];
-	uint8_t *body = (uint8_t*) &bnp[1];
+	struct bacnet_probe *bnp = (struct bacnet_probe*) &udp_header[1];
 
 	ip_header->ip_src.s_addr = src_ip;
 	ip_header->ip_dst.s_addr = dst_ip;
@@ -86,6 +86,8 @@ int bacnet_make_packet(void *buf, ipaddr_n_t src_ip, ipaddr_n_t dst_ip,
 
 	udp_header->uh_sport = htons(get_src_port(num_ports, probe_num,
 				validation));
+
+	bnp->apdu.invoke_id = get_invoke_id(validation);
 
 	ip_header->ip_sum = zmap_ip_checksum((unsigned short *) ip_header);
 
