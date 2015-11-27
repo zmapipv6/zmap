@@ -188,7 +188,10 @@ static fielddef_t fields[] = {
 	{.name = "icmp_code", .type = "int", .desc = "icmp message sub type code"},
 	{.name = "icmp_unreach_str", .type = "string", .desc = "for icmp_unreach responses, the string version of icmp_code "},
 	{.name = "udp_payload", .type = "binary", .desc = "UDP payload"},
+<<<<<<< HEAD
 	{.name = "device_id", .type = "int", .desc = "BACNet Device ID"},
+=======
+>>>>>>> d146df0fc43c08ee480328546a2c2d9677837017
 };
 
 probe_module_t module_bacnet = {
