@@ -95,11 +95,10 @@ int send_run_ip_init(sock_t s)
 		perror("SIOCGIFADDR");
 		return EXIT_FAILURE;
 	}
-	//
-	//int hdrincl = 1;
-	//if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &hdrincl, sizeof(hdrincl)) == -1) {
-	//    log_fatal("send-ip-init", "could not set sockopts: %s", strerror(errno));
-	//}
+	// because we don't provide a sockaddr_ll for sending IP layer packets,
+	// we need to manually set an interface for the socket
+	setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, &if_idx, IFNAMSIZ);
+	
 	return EXIT_SUCCESS;
 }
 
