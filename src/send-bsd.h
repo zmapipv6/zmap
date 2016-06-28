@@ -35,4 +35,14 @@ int send_packet(sock_t sock, void *buf, int len, UNUSED uint32_t idx)
 	return write(sock.sock, buf, len);
 }
 
+int send_run_ip_init(UNUSED sock_t s)
+{
+	log_fatal("send-ip", "this OS does not support IP layer sending");
+}
+
+int send_ip_packet(sock_t sock, void *buf, int len, UNUSED uint32_t idx)
+{
+	log_fatal("send-ip", "this OS does not support IP layer sending");
+}
+
 #endif /* ZMAP_SEND_BSD_H */

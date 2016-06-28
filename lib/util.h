@@ -37,7 +37,6 @@ int drop_privs();
 // Set CPU affinity to a single core
 int set_cpu(uint32_t core);
 
-
-
+const char *ip_to_str(uint32_t ip);
 
 #endif /* ZMAP_UTIL_H */

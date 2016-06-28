@@ -39,4 +39,15 @@ void send_finish(sock_t sock) {
 	pfring_zc_sync_queue(sock.pf.queue, tx_only);
 }
 
+int send_run_ip_init(socket_t s)
+{
+	log_fatal("send-ip", "PFRING does not support IP layer packets");
+}
+
+int send_packet(sock_t sock, void *buf, int len, UNUSED uint32_t idx)
+{
+	log_fatal("send-ip", "PFRING does not support IP layer sending");
+}
+
+
 #endif /* ZMAP_SEND_PFRING_H */

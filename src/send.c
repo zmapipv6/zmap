@@ -25,6 +25,7 @@
 #include "../lib/blacklist.h"
 #include "../lib/lockfd.h"
 #include "../lib/pbm.h"
+#include "../lib/util.h"
 
 #include "aesrand.h"
 #include "get_gateway.h"
@@ -38,6 +39,8 @@
 // OS specific functions called by send_run
 static inline int send_packet(sock_t sock, void *buf, int len, uint32_t idx);
 static inline int send_run_init(sock_t sock);
+static inline int send_ip_packet(sock_t sock, void *buf, int len, uint32_t idx);
+static inline int send_run_ip_init(sock_t sock);
 
 // Include the right implementations
 #if defined(PFRING)
@@ -201,8 +204,14 @@ int send_run(sock_t st, shard_t *s)
 	memset(buf, 0, MAX_PACKET_SIZE);
 
 	// OS specific per-thread init
-	if (send_run_init(st)) {
-		return -1;
+	if (!zconf.send_ip_pkts) {
+	    if (send_run_init(st)) {
+	    	return -1;
+	    }
+	} else {
+	    if (send_run_ip_init(st)) {
+	    	return -1;
+	    }
 	}
 
 	// MAC address length in characters
@@ -329,7 +338,6 @@ int send_run(sock_t st, shard_t *s)
 		}
 		for (int i=0; i < zconf.packet_streams; i++) {
 			uint32_t src_ip = get_src_ip(curr, i);
-
 		  	uint32_t validation[VALIDATE_BYTES/sizeof(uint32_t)];
 			validate_gen(src_ip, curr, (uint8_t *)validation);
 			zconf.probe_module->make_packet(buf, src_ip, curr,
@@ -343,16 +351,15 @@ int send_run(sock_t st, shard_t *s)
 				void *contents = buf + zconf.send_ip_pkts*sizeof(struct ether_header);
 				int any_sends_successful = 0;
 				for (int i = 0; i < attempts; ++i) {
-					int rc = send_packet(st, contents, length, idx);
+					int rc;
+				    if (!zconf.send_ip_pkts) {
+						rc = send_packet(st, contents, length, idx);
+					} else {
+						rc = send_ip_packet(st, contents, length, idx);
+					}
 					if (rc < 0) {
-						struct in_addr addr;
-						addr.s_addr = curr;
-						char addr_str_buf[INET_ADDRSTRLEN];
-						const char *addr_str = inet_ntop(AF_INET, &addr, addr_str_buf, INET_ADDRSTRLEN);
-						if (addr_str != NULL) {
-							log_debug("send", "send_packet failed for %s. %s",
-								addr_str, strerror(errno));
-						}
+						log_debug("send", "send_packet failed for %s. %s", ip_to_str(curr),
+								strerror(errno));
 					} else {
 						any_sends_successful = 1;
 						break;
