@@ -66,12 +66,12 @@ int send_packet(sock_t sock, void *buf, int len, UNUSED uint32_t idx)
 		      sizeof(struct sockaddr_ll));
 }
 
-int send_run_ip_init(socket_t s)
+int send_run_ip_init(sock_t s)
 {
 	log_fatal("send-ip", "this OS does not support IP layer sending");
 }
 
-int send_packet(sock_t sock, void *buf, int len, UNUSED uint32_t idx)
+int send_ip_packet(sock_t sock, void *buf, int len, UNUSED uint32_t idx)
 {
 	log_fatal("send-ip", "this OS does not support IP layer sending");
 }
