@@ -126,19 +126,19 @@ iterator_t* send_init(void)
 	assert(zconf.probe_module);
 	if (zconf.probe_module->global_initialize) {
 		if (zconf.probe_module->global_initialize(&zconf)) {
-        		log_fatal("send", "global initialization for probe module failed.");
-	        }
+				log_fatal("send", "global initialization for probe module failed.");
+			}
 	}
 	// concert specified bandwidth to packet rate
 	if (zconf.bandwidth > 0) {
 		size_t pkt_len = zconf.probe_module->packet_length;
 		pkt_len *= 8;
 		pkt_len += 8*24; // 7 byte MAC preamble, 1 byte Start frame,
-		                 // 4 byte CRC, 12 byte inter-frame gap
+						 // 4 byte CRC, 12 byte inter-frame gap
 		if (pkt_len < 84*8) {
 			pkt_len = 84*8;
 		}
-        // rate is a uint32_t so, don't overflow
+		// rate is a uint32_t so, don't overflow
 		if (zconf.bandwidth / pkt_len > 0xFFFFFFFFu) {
 			zconf.rate = 0;
 		} else {
@@ -154,22 +154,22 @@ iterator_t* send_init(void)
 	}
 	// Get the source hardware address, and give it to the probe
 	// module
-    if (!zconf.hw_mac_set) {
-	    if (get_iface_hw_addr(zconf.iface, zconf.hw_mac)) {
-	    	log_fatal("send", "could not retrieve hardware address for "
-	    		  "interface: %s", zconf.iface);
-	    	return NULL;
-	    }
-        log_debug("send", "no source MAC provided. "
-                "automatically detected %02x:%02x:%02x:%02x:%02x:%02x as hw "
-                "interface for %s",
-                zconf.hw_mac[0], zconf.hw_mac[1], zconf.hw_mac[2],
-                zconf.hw_mac[3], zconf.hw_mac[4], zconf.hw_mac[5],
-                zconf.iface);
-    }
+	if (!zconf.hw_mac_set) {
+		if (get_iface_hw_addr(zconf.iface, zconf.hw_mac)) {
+			log_fatal("send", "could not retrieve hardware address for "
+				  "interface: %s", zconf.iface);
+			return NULL;
+		}
+		log_debug("send", "no source MAC provided. "
+				"automatically detected %02x:%02x:%02x:%02x:%02x:%02x as hw "
+				"interface for %s",
+				zconf.hw_mac[0], zconf.hw_mac[1], zconf.hw_mac[2],
+				zconf.hw_mac[3], zconf.hw_mac[4], zconf.hw_mac[5],
+				zconf.iface);
+	}
 	log_debug("send", "source MAC address %02x:%02x:%02x:%02x:%02x:%02x",
-           zconf.hw_mac[0], zconf.hw_mac[1], zconf.hw_mac[2],
-           zconf.hw_mac[3], zconf.hw_mac[4], zconf.hw_mac[5]);
+		   zconf.hw_mac[0], zconf.hw_mac[1], zconf.hw_mac[2],
+		   zconf.hw_mac[3], zconf.hw_mac[4], zconf.hw_mac[5]);
 
 	if (zconf.dryrun) {
 		log_info("send", "dryrun mode -- won't actually send packets");
@@ -205,13 +205,13 @@ int send_run(sock_t st, shard_t *s)
 
 	// OS specific per-thread init
 	if (!zconf.send_ip_pkts) {
-	    if (send_run_init(st)) {
-	    	return -1;
-	    }
+		if (send_run_init(st)) {
+			return -1;
+		}
 	} else {
-	    if (send_run_ip_init(st)) {
-	    	return -1;
-	    }
+		if (send_run_ip_init(st)) {
+			return -1;
+		}
 	}
 
 	// MAC address length in characters
@@ -244,26 +244,26 @@ int send_run(sock_t st, shard_t *s)
 	int interval = 0;
 	uint32_t max_targets = s->state.max_targets;
 	volatile int vi;
-    struct timespec ts, rem;
-    double send_rate = (double) zconf.rate / zconf.senders;
-    const double slow_rate = 50; // packets per seconds per thread
- 			   					// at which it uses the slow methods
-    long nsec_per_sec = 1000 * 1000 * 1000;
-    long long sleep_time = nsec_per_sec;
+	struct timespec ts, rem;
+	double send_rate = (double) zconf.rate / zconf.senders;
+	const double slow_rate = 50; // packets per seconds per thread
+				   					// at which it uses the slow methods
+	long nsec_per_sec = 1000 * 1000 * 1000;
+	long long sleep_time = nsec_per_sec;
 	if (zconf.rate > 0) {
 		delay = 10000;
-        if (send_rate < slow_rate) {
-            // set the inital time difference
-            sleep_time = nsec_per_sec / send_rate;
-            last_time = now() - (1.0 / send_rate);
-        } else {
-		    // estimate initial rate
-		    for (vi = delay; vi--; )
-		    	;
-		    delay *= 1 / (now() - last_time) / (zconf.rate / zconf.senders);
-		    interval = (zconf.rate / zconf.senders) / 20;
-		    last_time = now();
-        }
+		if (send_rate < slow_rate) {
+			// set the inital time difference
+			sleep_time = nsec_per_sec / send_rate;
+			last_time = now() - (1.0 / send_rate);
+		} else {
+				// estimate initial rate
+				for (vi = delay; vi--; )
+					;
+				delay *= 1 / (now() - last_time) / (zconf.rate / zconf.senders);
+				interval = (zconf.rate / zconf.senders) / 20;
+				last_time = now();
+		}
 	}
 	uint32_t curr = shard_get_cur_ip(s);
 	// if list of IPs provided to scan, then the first generated address
@@ -287,30 +287,30 @@ int send_run(sock_t st, shard_t *s)
 		send_rate = (double) zconf.rate / zconf.senders;
 		if (delay > 0) {
 			count++;
-            if (send_rate < slow_rate) {
-                double t = now();
-                double last_rate = (1.0 / (t - last_time));
+			if (send_rate < slow_rate) {
+				double t = now();
+				double last_rate = (1.0 / (t - last_time));
 
-                sleep_time *= ((last_rate / send_rate) + 1) / 2;
-                ts.tv_sec = sleep_time / nsec_per_sec;
-                ts.tv_nsec = sleep_time % nsec_per_sec;
-                log_debug("sleep", "sleep for %d sec, %ld nanoseconds",
+				sleep_time *= ((last_rate / send_rate) + 1) / 2;
+				ts.tv_sec = sleep_time / nsec_per_sec;
+				ts.tv_nsec = sleep_time % nsec_per_sec;
+				log_debug("sleep", "sleep for %d sec, %ld nanoseconds",
 				ts.tv_sec, ts.tv_nsec);
-                while (nanosleep(&ts, &rem) == -1) {}
-                last_time = t;
-            } else {
-			    for (vi = delay; vi--; )
-			    	;
-			    if (!interval || (count % interval == 0)) {
-			    	double t = now();
-			    	delay *= (double)(count - last_count)
-			    		/ (t - last_time) / (zconf.rate / zconf.senders);
-			    	if (delay < 1)
-			    		delay = 1;
-			    	last_count = count;
-			    	last_time = t;
-			    }
-            }
+				while (nanosleep(&ts, &rem) == -1) {}
+				last_time = t;
+			} else {
+				for (vi = delay; vi--; )
+					;
+				if (!interval || (count % interval == 0)) {
+					double t = now();
+					delay *= (double)(count - last_count)
+						/ (t - last_time) / (zconf.rate / zconf.senders);
+					if (delay < 1)
+						delay = 1;
+					last_count = count;
+					last_time = t;
+				}
+			}
 		}
 		if (zrecv.complete) {
 			s->cb(s->id, s->arg);
@@ -348,14 +348,17 @@ int send_run(sock_t st, shard_t *s)
 				unlock_file(stdout);
 			} else {
 				int length = zconf.probe_module->packet_length;
+				if (zconf.send_ip_pkts) {
+					length -= sizeof(struct ether_header);
+				}
 				void *contents = buf + zconf.send_ip_pkts*sizeof(struct ether_header);
 				int any_sends_successful = 0;
 				for (int i = 0; i < attempts; ++i) {
 					int rc;
-				    if (!zconf.send_ip_pkts) {
-						rc = send_packet(st, contents, length, idx);
-					} else {
+					if (zconf.send_ip_pkts) {
 						rc = send_ip_packet(st, contents, length, idx);
+					} else {
+						rc = send_packet(st, contents, length, idx);
 					}
 					if (rc < 0) {
 						log_debug("send", "send_packet failed for %s. %s", ip_to_str(curr),

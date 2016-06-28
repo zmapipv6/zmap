@@ -214,6 +214,8 @@ static void start_zmap(void)
 		sock_t sock;
 		if (zconf.dryrun) {
 			sock = get_dryrun_socket();
+		} else if (zconf.send_ip_pkts) {
+			sock = get_ip_socket(i);
 		} else {
 			sock = get_socket(i);
 		}
