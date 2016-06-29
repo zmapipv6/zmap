@@ -26,6 +26,7 @@ struct state_conf zconf = {
 	.max_results = 0,
 	.iface = NULL,
 	.rate = 0,
+	.initial_rate = 0,
 	.bandwidth = 0,
 	.cooldown_secs = 0,
 	.senders = 1,

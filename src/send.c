@@ -69,7 +69,7 @@ static uint16_t num_src_ports;
 void sig_handler_increase_speed(UNUSED int signal)
 {
 	int old_rate = zconf.rate;
-	zconf.rate += (zconf.rate * 0.05);
+	zconf.rate += (zconf.initial_rate * 0.05);
 	log_info("send", "send rate increased from %i to %i pps.",
 			old_rate, zconf.rate);
 }
@@ -77,7 +77,7 @@ void sig_handler_increase_speed(UNUSED int signal)
 void sig_handler_decrease_speed(UNUSED int signal)
 {
 	int old_rate = zconf.rate;
-	zconf.rate -= (zconf.rate * 0.05);
+	zconf.rate -= (zconf.initial_rate * 0.05);
 	log_info("send", "send rate decreased from %i to %i pps.",
 			old_rate, zconf.rate);
 }
@@ -246,6 +246,7 @@ int send_run(sock_t st, shard_t *s)
 	volatile int vi;
     struct timespec ts, rem;
     double send_rate = (double) zconf.rate / zconf.senders;
+	zconf.initial_rate = zconf.rate;
     const double slow_rate = 50; // packets per seconds per thread
  			   					// at which it uses the slow methods
     long nsec_per_sec = 1000 * 1000 * 1000;

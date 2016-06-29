@@ -56,6 +56,7 @@ struct state_conf {
 	// rate in packets per second
 	// that the sender will maintain
 	int rate;
+	int initial_rate;
 	// rate in bits per second
 	uint64_t bandwidth;
 	// how many seconds after the termination of the sender will the receiver
