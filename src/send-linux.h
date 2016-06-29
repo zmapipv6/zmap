@@ -66,14 +66,56 @@ int send_packet(sock_t sock, void *buf, int len, UNUSED uint32_t idx)
 		      sizeof(struct sockaddr_ll));
 }
 
-int send_run_ip_init(socket_t s)
+int send_run_ip_init(sock_t s)
 {
-	log_fatal("send-ip", "this OS does not support IP layer sending");
+	int sock = s.sock;
+	// get source interface index
+	struct ifreq if_idx;
+	memset(&if_idx, 0, sizeof(struct ifreq));
+	if (strlen(zconf.iface) >= IFNAMSIZ) {
+		log_error("send", "device interface name (%s) too long\n",
+				zconf.iface);
+		return EXIT_FAILURE;
+	}
+	strncpy(if_idx.ifr_name, zconf.iface, IFNAMSIZ-1);
+	if (ioctl(sock, SIOCGIFINDEX, &if_idx) < 0) {
+		perror("SIOCGIFINDEX");
+		return EXIT_FAILURE;
+	}
+	int ifindex = if_idx.ifr_ifindex;
+
+	// find source IP address associated with the dev from which we're sending.
+	// while we won't use this address for sending packets, we need the address
+	// to set certain socket options and it's easiest to just use the primary
+	// address the OS believes is associated.
+	struct ifreq if_ip;
+	memset(&if_ip, 0, sizeof(struct ifreq));
+	strncpy(if_ip.ifr_name, zconf.iface, IFNAMSIZ-1);
+	if (ioctl(sock, SIOCGIFADDR, &if_ip) < 0) {
+		perror("SIOCGIFADDR");
+		return EXIT_FAILURE;
+	}
+	// because we don't provide a sockaddr_ll for sending IP layer packets,
+	// we need to manually set an interface for the socket
+	if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, zconf.iface, IFNAMSIZ)) {
+	//if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, &if_idx, IFNAMSIZ)) {
+		perror("SO_BINDTODEVICE");
+		return EXIT_FAILURE;
+	}
+	// destination address for the socket
+	memset((void*) &sockaddr, 0, sizeof(struct sockaddr_ll));
+	sockaddr.sll_ifindex = ifindex;
+	sockaddr.sll_halen = ETH_ALEN;
+	memcpy(sockaddr.sll_addr, zconf.gw_mac, ETH_ALEN);
+
+	return EXIT_SUCCESS;
 }
 
-int send_packet(sock_t sock, void *buf, int len, UNUSED uint32_t idx)
+int send_ip_packet(sock_t sock, void *buf, int len, UNUSED uint32_t idx)
 {
-	log_fatal("send-ip", "this OS does not support IP layer sending");
+	return sendto(sock.sock, buf, len, 0,
+			(struct sockaddr *) &sockaddr,
+			sizeof(struct sockaddr_ll));
 }
 
 #endif /* ZMAP_SEND_LINUX_H */

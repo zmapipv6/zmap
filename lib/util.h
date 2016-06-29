@@ -32,7 +32,12 @@ int file_exists(char *name);
 
 // If running as root, drops privileges to that of user "nobody".
 // Otherwise, does nothing.
-int drop_privs();
+
+#define DROP_PRIV_SUCCESS 0
+#define DROP_PRIV_FAILURE 1
+#define DROP_PRIV_NO_CHANGE 2
+
+int drop_privs(void);
 
 // Set CPU affinity to a single core
 int set_cpu(uint32_t core);

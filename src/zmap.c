@@ -54,11 +54,13 @@ static int32_t distrib_func(pfring_zc_pkt_buff *pkt, void *arg) {
 #endif
 
 pthread_mutex_t recv_ready_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t send_ready_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct send_arg {
 	uint32_t cpu;
 	sock_t sock;
 	shard_t *shard;
+	int thread_id;
 } send_arg_t;
 
 typedef struct recv_arg {
@@ -89,9 +91,9 @@ static void enforce_range(const char *name, int v, int min, int max)
 static void* start_send(void *arg)
 {
 	send_arg_t *s = (send_arg_t *) arg;
-	log_debug("zmap", "Pinning a send thread to core %u", s->cpu);
+	log_debug("zmap", "Pinning send thread %u to core %u", s->thread_id, s->cpu);
 	set_cpu(s->cpu);
-	send_run(s->sock, s->shard);
+	send_run(s->thread_id, s->sock, s->shard, &send_ready_mutex);
 	free(s);
 	return NULL;
 }
@@ -162,10 +164,9 @@ static void start_zmap(void)
 	if (zconf.output_module && zconf.output_module->init) {
 		if (zconf.output_module->init(&zconf, zconf.output_fields,
 				zconf.output_fields_len)) {
-            log_fatal("zmap", "output module did not initialize successfully.");
-        }
+			log_fatal("zmap", "output module did not initialize successfully.");
+		}
 	}
-
 	iterator_t *it = send_init();
 	if (!it) {
 		log_fatal("zmap", "unable to initialize sending component");
@@ -214,6 +215,8 @@ static void start_zmap(void)
 		sock_t sock;
 		if (zconf.dryrun) {
 			sock = get_dryrun_socket();
+		} else if (zconf.send_ip_pkts) {
+			sock = get_ip_socket(i);
 		} else {
 			sock = get_socket(i);
 		}
@@ -222,6 +225,7 @@ static void start_zmap(void)
 		arg->sock = sock;
 		arg->shard = get_shard(it, i);
 		arg->cpu = zconf.pin_cores[cpu % zconf.pin_cores_len];
+		arg->thread_id = (int) i;
 		cpu += 1;
 		int r = pthread_create(&tsend[i], NULL, start_send, arg);
 		if (r != 0) {
@@ -230,7 +234,15 @@ static void start_zmap(void)
 		}
 	}
 	log_debug("zmap", "%d sender threads spawned", zconf.senders);
-
+	for (;;) {
+		pthread_mutex_lock(&send_ready_mutex);
+		if (zconf.send_threads_ready == zconf.senders) {
+			pthread_mutex_unlock(&send_ready_mutex);
+			break;
+		}
+		pthread_mutex_unlock(&send_ready_mutex);
+	}
+	log_debug("zmap", "%d sender threads initialized", zconf.senders);
 	if (!zconf.dryrun) {
 		monitor_init();
 		mon_start_arg_t *mon_arg = xmalloc(sizeof(mon_start_arg_t));
@@ -245,9 +257,17 @@ static void start_zmap(void)
 	}
 
 #ifndef PFRING
-	drop_privs();
+	int drop_priv_rt = drop_privs();
+	if (drop_priv_rt == DROP_PRIV_SUCCESS) {
+		log_debug("privs", "successfully dropped root privileges");
+	} else if (drop_priv_rt == DROP_PRIV_NO_CHANGE) {
+		log_debug("privs", "no privilege change. not running as root.");
+	} else {
+		log_fatal("privs", "unable to drop root privileges");
+	}
+#else
+	log_debug("privs", "root privs not dropped because needed for PF_RING")
 #endif
-
 	// wait for completion
 	for (uint8_t i = 0; i < zconf.senders; i++) {
 		int r = pthread_join(tsend[i], NULL);
@@ -392,19 +412,18 @@ int main(int argc, char *argv[])
 	if (!zconf.probe_module) {
 		log_fatal("zmap", "specified probe module (%s) does not exist\n",
 				args.probe_module_arg);
-	  exit(EXIT_FAILURE);
 	}
-    // check whether the probe module is going to generate dynamic data
-    // and that the output module can support exporting that data out of
-    // zmap. If they can't, then quit.
-    if (zconf.probe_module->output_type == OUTPUT_TYPE_DYNAMIC
-            && !zconf.output_module->supports_dynamic_output) {
-        log_fatal("zmap", "specified probe module (%s) requires dynamic "
-                "output support, which output module (%s) does not support. "
-                "Most likely you want to use JSON output.",
-                args.probe_module_arg,
-                args.output_module_arg);
-    }
+	// check whether the probe module is going to generate dynamic data
+	// and that the output module can support exporting that data out of
+	// zmap. If they can't, then quit.
+	if (zconf.probe_module->output_type == OUTPUT_TYPE_DYNAMIC
+			&& !zconf.output_module->supports_dynamic_output) {
+		log_fatal("zmap", "specified probe module (%s) requires dynamic "
+				"output support, which output module (%s) does not support. "
+				"Most likely you want to use JSON output.",
+				args.probe_module_arg,
+				args.output_module_arg);
+	}
 	if (args.help_given) {
 		cmdline_parser_print_help();
 		printf("\nProbe-module (%s) Help:\n", zconf.probe_module->name);
