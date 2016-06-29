@@ -356,6 +356,7 @@ int send_run(int sender_id, sock_t st, shard_t *s, pthread_mutex_t *send_ready_m
 				if (zconf.send_ip_pkts) {
 					length -= sizeof(struct ether_header);
 				}
+				// don't include ethernet header if we're sending IP packets
 				void *contents = buf + zconf.send_ip_pkts*sizeof(struct ether_header);
 				int any_sends_successful = 0;
 				for (int i = 0; i < attempts; ++i) {

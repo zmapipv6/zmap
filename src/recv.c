@@ -29,32 +29,53 @@ static u_char fake_eth_hdr[65535];
 
 // bitmap of observed IP addresses
 static uint8_t **seen = NULL;
+static int ip_packets = 0;
+static int is_first_packet = 1;
+static uint32_t expected_length = sizeof(struct ip) + sizeof(struct ether_header);
 
 void handle_packet(uint32_t buflen, const u_char *bytes) {
-	if ((sizeof(struct ip) + (zconf.send_ip_pkts ? 0 : sizeof(struct ether_header))) > buflen) {
-		// buffer not large enough to contain ethernet
-		// and ip headers. further action would overrun buf
+	if (is_first_packet) {
+		// double check that we're getting ethernet frames and not just IP packets
+		// if this is an IP packet, then process the remainder as IP packets
+		if (buflen < sizeof(struct ether_header)) {
+			return;
+		}
+		struct ether_header *eth = (struct ether_header *) bytes;
+		if (eth->ether_type != ETHERTYPE_IP) {
+			// sure doesn't look like an ethernet header, but that's only one byte
+			// so let's also check that it also looks like an IP header
+			struct ip *ip_hdr = (struct ip *) bytes;
+			if (buflen < sizeof(struct ip)) {
+				return; // not safe to process as an IP packet	
+			} 
+			if (ip_hdr->ip_v == 0x4) {
+				ip_packets = 1;
+				expected_length = sizeof(struct ip);
+			}
+		} 
+		is_first_packet = 0;
+	}
+	if (expected_length > buflen) {
 		return;
 	}
-	struct ip *ip_hdr = (struct ip *) &bytes[(zconf.send_ip_pkts ? 0 : sizeof(struct ether_header))];
 
+	struct ip *ip_hdr = (struct ip *) &bytes[(ip_packets ? 0 : sizeof(struct ether_header))];
 	uint32_t src_ip = ip_hdr->ip_src.s_addr;
-
 	uint32_t validation[VALIDATE_BYTES/sizeof(uint8_t)];
 	// TODO: for TTL exceeded messages, ip_hdr->saddr is going to be different
 	// and we must calculate off potential payload message instead
 	validate_gen(ip_hdr->ip_dst.s_addr, ip_hdr->ip_src.s_addr, (uint8_t *) validation);
 
-	if (!zconf.probe_module->validate_packet(ip_hdr, buflen - (zconf.send_ip_pkts ? 0 : sizeof(struct ether_header)),
+	if (!zconf.probe_module->validate_packet(ip_hdr, buflen - (ip_packets ? 0 : sizeof(struct ether_header)),
 				&src_ip, validation)) {
 		return;
 	}
-    // woo! We've validated that the packet is a response to our scan
+	// woo! We've validated that the packet is a response to our scan
 	int is_repeat = pbm_check(seen, ntohl(src_ip));
-    // track whether this is the first packet in an IP fragment.
-    if (ip_hdr->ip_off & IP_MF) {
-        zrecv.ip_fragments++;
-    }
+	// track whether this is the first packet in an IP fragment.
+	if (ip_hdr->ip_off & IP_MF) {
+		zrecv.ip_fragments++;
+	}
 
 	fieldset_t *fs = fs_new_fieldset();
 	fs_add_ip_fields(fs, ip_hdr);
@@ -63,7 +84,7 @@ void handle_packet(uint32_t buflen, const u_char *bytes) {
 	// in process_packet. For VPN, we only get back an IP frame.
 	// Here, we fake an ethernet frame (which is initialized to
 	// have ETH_P_IP proto and 00s for dest/src).
-	if (zconf.send_ip_pkts) {
+	if (ip_packets) {
 		if (buflen > sizeof(fake_eth_hdr)) {
 			buflen = sizeof(fake_eth_hdr);
 		}
