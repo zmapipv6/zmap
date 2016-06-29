@@ -53,9 +53,6 @@ static inline int send_run_ip_init(sock_t sock);
 
 // The iterator over the cyclic group
 
-// Lock for send run
-static pthread_mutex_t send_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 // Source IP address for outgoing packets
 static in_addr_t srcip_first;
 static in_addr_t srcip_last;
@@ -195,10 +192,17 @@ static inline ipaddr_n_t get_src_ip(ipaddr_n_t dst, int local_offset)
 }
 
 // one sender thread
-int send_run(sock_t st, shard_t *s)
+int send_run(int sender_id, sock_t st, shard_t *s, pthread_mutex_t *send_ready_mutex)
 {
-	log_debug("send", "send thread started");
-	pthread_mutex_lock(&send_mutex);
+	// generate a name for the sender to be used for log messages that's 
+	// based on the thread's ID
+	char sendname[1024];
+	snprintf(sendname, sizeof(sendname), "send-%i", sender_id);
+	log_debug(sendname, "send thread started");
+	// only one send thread can initialize at once. once that's completed
+	// we'll increment send_threads_ready such that the parent ZMap process
+	// can drop root privileges. 
+	pthread_mutex_lock(send_ready_mutex);
 	// Allocate a buffer to hold the outgoing packet
 	char buf[MAX_PACKET_SIZE];
 	memset(buf, 0, MAX_PACKET_SIZE);
@@ -206,11 +210,11 @@ int send_run(sock_t st, shard_t *s)
 	// OS specific per-thread init
 	if (!zconf.send_ip_pkts) {
 		if (send_run_init(st)) {
-			return -1;
+			log_fatal("send", "unable to configure socket correctly");	
 		}
 	} else {
 		if (send_run_ip_init(st)) {
-			return -1;
+			log_fatal("send", "unable to configure socket correctly");	
 		}
 	}
 
@@ -226,15 +230,16 @@ int send_run(sock_t st, shard_t *s)
 			p += 3;
 		}
 	}
-	log_debug("send", "source MAC address %s",
-			mac_buf);
+	//log_debug("send", "source MAC address %s", mac_buf);
 	void *probe_data;
 	if (zconf.probe_module->thread_initialize) {
 		zconf.probe_module->thread_initialize(buf, zconf.hw_mac,
 						zconf.gw_mac,
 						zconf.target_port, &probe_data);
 	}
-	pthread_mutex_unlock(&send_mutex);
+	log_debug(sendname, "initialization finished successfully");
+	zconf.send_threads_ready++;
+	pthread_mutex_unlock(send_ready_mutex);
 
 	// adaptive timing to hit target rate
 	uint32_t count = 0;

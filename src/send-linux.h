@@ -82,7 +82,7 @@ int send_run_ip_init(sock_t s)
 		perror("SIOCGIFINDEX");
 		return EXIT_FAILURE;
 	}
-	//int ifindex = if_idx.ifr_ifindex;
+	int ifindex = if_idx.ifr_ifindex;
 
 	// find source IP address associated with the dev from which we're sending.
 	// while we won't use this address for sending packets, we need the address
@@ -97,17 +97,25 @@ int send_run_ip_init(sock_t s)
 	}
 	// because we don't provide a sockaddr_ll for sending IP layer packets,
 	// we need to manually set an interface for the socket
-	setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, &if_idx, IFNAMSIZ);
-	
+	if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, zconf.iface, IFNAMSIZ)) {
+	//if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, &if_idx, IFNAMSIZ)) {
+		perror("SO_BINDTODEVICE");
+		return EXIT_FAILURE;
+	}
+	// destination address for the socket
+	memset((void*) &sockaddr, 0, sizeof(struct sockaddr_ll));
+	sockaddr.sll_ifindex = ifindex;
+	sockaddr.sll_halen = ETH_ALEN;
+	memcpy(sockaddr.sll_addr, zconf.gw_mac, ETH_ALEN);
+
 	return EXIT_SUCCESS;
 }
 
 int send_ip_packet(sock_t sock, void *buf, int len, UNUSED uint32_t idx)
 {
 	return sendto(sock.sock, buf, len, 0,
-		      (struct sockaddr *) &sockaddr,
-		      sizeof(struct sockaddr_ll));
-
+			(struct sockaddr *) &sockaddr,
+			sizeof(struct sockaddr_ll));
 }
 
 #endif /* ZMAP_SEND_LINUX_H */

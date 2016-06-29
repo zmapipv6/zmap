@@ -207,14 +207,14 @@ int drop_privs()
 	struct passwd *pw;
 	if (geteuid() != 0) {
 		/* Not root */
-		return EXIT_SUCCESS;
+		return DROP_PRIV_NO_CHANGE;
 	}
 	if ((pw = getpwnam("nobody")) != NULL) {
 		if (setuid(pw->pw_uid) == 0) {
-			return EXIT_SUCCESS; // success
+			return DROP_PRIV_SUCCESS; // success
 		}
 	}
-	return EXIT_FAILURE;
+	return DROP_PRIV_FAILURE;
 }
 
 #if defined(__APPLE__)
