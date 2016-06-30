@@ -85,7 +85,7 @@ void make_ip_header(struct ip *iph, uint8_t protocol, uint16_t len)
 	iph->ip_hl = 5; // Internet Header Length
 	iph->ip_v = 4; // IPv4
 	iph->ip_tos = 0; // Type of Service
-	iph->ip_len = len;
+	iph->ip_len = ntohs(len);
 	iph->ip_id = htons(54321); // identification number
 	iph->ip_off = 0; //fragmentation flag
 	iph->ip_ttl = MAXTTL; // time to live (TTL)

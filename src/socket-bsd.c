@@ -9,6 +9,7 @@
 #include "socket.h"
 
 #include <errno.h>
+#include <string.h>
 
 #include "../lib/includes.h"
 #include "../lib/logger.h"
@@ -20,6 +21,8 @@
 #include <net/bpf.h>
 
 #include "state.h"
+
+
 
 sock_t get_socket(UNUSED uint32_t id)
 {
@@ -62,7 +65,20 @@ sock_t get_socket(UNUSED uint32_t id)
 }
 
 
-sock_t get_ip_socket(UNUSED uint32_t id)
+sock_t get_ip_socket(uint32_t id)
 {
-	log_fatal("ip-socket", "IP sockets are not supported on Mac OS or BSD");
+	int sock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
+	if (sock <= 0) {
+		log_fatal("send", "couldn't create IP socket. "
+			"Are you root? Error: %s\n", strerror(errno));
+	}
+	const int on = 1;
+	if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on))) {
+	    perror("setsockopt");
+	    exit(1);
+	}
+
+	sock_t s;
+	s.sock = sock;
+	return s;
 }

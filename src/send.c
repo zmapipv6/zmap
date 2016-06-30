@@ -151,7 +151,7 @@ iterator_t* send_init(void)
 	}
 	// Get the source hardware address, and give it to the probe
 	// module
-	if (!zconf.hw_mac_set) {
+	if (!zconf.hw_mac_set && !zconf.send_ip_pkts) {
 		if (get_iface_hw_addr(zconf.iface, zconf.hw_mac)) {
 			log_fatal("send", "could not retrieve hardware address for "
 				  "interface: %s", zconf.iface);
@@ -194,14 +194,14 @@ static inline ipaddr_n_t get_src_ip(ipaddr_n_t dst, int local_offset)
 // one sender thread
 int send_run(int sender_id, sock_t st, shard_t *s, pthread_mutex_t *send_ready_mutex)
 {
-	// generate a name for the sender to be used for log messages that's 
+	// generate a name for the sender to be used for log messages that's
 	// based on the thread's ID
 	char sendname[1024];
 	snprintf(sendname, sizeof(sendname), "send-%i", sender_id);
 	log_debug(sendname, "send thread started");
 	// only one send thread can initialize at once. once that's completed
 	// we'll increment send_threads_ready such that the parent ZMap process
-	// can drop root privileges. 
+	// can drop root privileges.
 	pthread_mutex_lock(send_ready_mutex);
 	// Allocate a buffer to hold the outgoing packet
 	char buf[MAX_PACKET_SIZE];
@@ -210,11 +210,11 @@ int send_run(int sender_id, sock_t st, shard_t *s, pthread_mutex_t *send_ready_m
 	// OS specific per-thread init
 	if (!zconf.send_ip_pkts) {
 		if (send_run_init(st)) {
-			log_fatal("send", "unable to configure socket correctly");	
+			log_fatal("send", "unable to configure socket correctly");
 		}
 	} else {
 		if (send_run_ip_init(st)) {
-			log_fatal("send", "unable to configure socket correctly");	
+			log_fatal("send", "unable to configure socket correctly");
 		}
 	}
 
@@ -299,8 +299,6 @@ int send_run(int sender_id, sock_t st, shard_t *s, pthread_mutex_t *send_ready_m
 				sleep_time *= ((last_rate / send_rate) + 1) / 2;
 				ts.tv_sec = sleep_time / nsec_per_sec;
 				ts.tv_nsec = sleep_time % nsec_per_sec;
-				log_debug("sleep", "sleep for %d sec, %ld nanoseconds",
-				ts.tv_sec, ts.tv_nsec);
 				while (nanosleep(&ts, &rem) == -1) {}
 				last_time = t;
 			} else {

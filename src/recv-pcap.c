@@ -51,9 +51,10 @@ void packet_cb(u_char __attribute__((__unused__)) *user,
 
 #define BPFLEN 1024
 
-void recv_init()
+void recv_init(void)
 {
 	char bpftmp[BPFLEN];
+	memset(bpftmp, 0, BPFLEN);
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pc = pcap_open_live(zconf.iface, zconf.probe_module->pcap_snaplen,
 					PCAP_PROMISC, PCAP_TIMEOUT, errbuf);
@@ -63,14 +64,18 @@ void recv_init()
 	}
 	struct bpf_program bpf;
 
-	snprintf(bpftmp, sizeof(bpftmp)-1, "not ether src %02x:%02x:%02x:%02x:%02x:%02x",
-		zconf.hw_mac[0], zconf.hw_mac[1], zconf.hw_mac[2],
-		zconf.hw_mac[3], zconf.hw_mac[4], zconf.hw_mac[5]);
-	assert(strlen(zconf.probe_module->pcap_filter) + 10 < (BPFLEN - strlen(bpftmp)));
-	if (zconf.probe_module->pcap_filter) {
-		strcat(bpftmp, " and (");
+	if (!zconf.send_ip_pkts) {
+		snprintf(bpftmp, sizeof(bpftmp)-1, "not ether src %02x:%02x:%02x:%02x:%02x:%02x",
+			zconf.hw_mac[0], zconf.hw_mac[1], zconf.hw_mac[2],
+			zconf.hw_mac[3], zconf.hw_mac[4], zconf.hw_mac[5]);
+		assert(strlen(zconf.probe_module->pcap_filter) + 10 < (BPFLEN - strlen(bpftmp)));
+		if (zconf.probe_module->pcap_filter) {
+			strcat(bpftmp, " and (");
+			strcat(bpftmp, zconf.probe_module->pcap_filter);
+			strcat(bpftmp, ")");
+		}
+	} else {
 		strcat(bpftmp, zconf.probe_module->pcap_filter);
-		strcat(bpftmp, ")");
 	}
 	if (pcap_compile(pc, &bpf, bpftmp, 1, 0) < 0) {
 		log_fatal("recv", "couldn't compile filter");
@@ -86,7 +91,7 @@ void recv_init()
 	}
 }
 
-void recv_packets()
+void recv_packets(void)
 {
 	int ret = pcap_dispatch(pc, -1, packet_cb, NULL);
 	if (ret == -1) {
@@ -96,7 +101,7 @@ void recv_packets()
 	}
 }
 
-void recv_cleanup()
+void recv_cleanup(void)
 {
 	pcap_close(pc);
 	pc = NULL;
