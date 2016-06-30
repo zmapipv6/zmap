@@ -273,10 +273,12 @@ int set_cpu(uint32_t core)
 #endif
 
 
+char addr_str_buf[INET_ADDRSTRLEN];
+
 const char *ip_to_str(uint32_t ip)
 {
 	struct in_addr addr;
 	addr.s_addr = ip;
-	char addr_str_buf[INET_ADDRSTRLEN];
-	return inet_ntop(AF_INET, &addr, addr_str_buf, INET_ADDRSTRLEN);
+	inet_ntop(AF_INET, &addr, addr_str_buf, INET_ADDRSTRLEN);
+	return addr_str_buf;
 }
