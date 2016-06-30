@@ -21,3 +21,8 @@ sock_t get_socket(uint32_t id)
 	return sock;
 }
 
+
+sock_t get_ip_socket(UNUSED uint32_t id)
+{
+	log_fatal("ip-socket", "IP sockets are not supported for PF_RING");
+}

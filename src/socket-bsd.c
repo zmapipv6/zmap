@@ -60,3 +60,9 @@ sock_t get_socket(UNUSED uint32_t id)
 	ret.sock = bpf;
 	return ret;
 }
+
+
+sock_t get_ip_socket(UNUSED uint32_t id)
+{
+	log_fatal("ip-socket", "IP sockets are not supported on Mac OS or BSD");
+}
