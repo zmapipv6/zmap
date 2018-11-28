@@ -36,7 +36,7 @@
 #include "send.h"
 #include "recv.h"
 #include "state.h"
-#include "monitor.h"
+//#include "monitor.h"
 #include "get_gateway.h"
 #include "filter.h"
 #include "summary.h"

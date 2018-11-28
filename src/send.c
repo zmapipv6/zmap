@@ -291,33 +291,25 @@ int send_run(sock_t st, shard_t *s)
 	uint32_t current_ip;
 	struct in6_addr ipv6_dst;
 
-	if (ipv6) {
-		ipv6_target_file_get_ipv6(&ipv6_dst);
-		probe_data = malloc(2*sizeof(struct in6_addr));
-	} else {
-		current_ip = shard_get_cur_ip(s);
-
-		// If provided a list of IPs to scan, then the first generated address
-		// might not be on that list. Iterate until the current IP is one the
-		// list, then start the true scanning process.
-		if (zconf.list_of_ips_filename) {
-			while (!pbm_check(zsend.list_of_ips_pbm, current_ip)) {
-				current_ip = shard_get_next_ip(s);
-				s->state.tried_sent++;
-				if (current_ip == ZMAP_SHARD_DONE) {
-					log_debug(
-						"send",
-						"never made it to send loop in send thread %i",
-						s->thread_id);
-					goto cleanup;
-				}
-			}
-		}
-	}
 	int attempts = zconf.num_retries + 1;
 	uint32_t idx = 0;
+	char line[100];
+	probe_data = malloc(2*sizeof(struct in6_addr));
 	while (1) {
 		// Adaptive timing delay
+		memset(line, sizeof(line))
+		lock_file(stdin);
+		scanf("%s", &line);
+		unlock_file(stdin); 
+
+		if strcmp(line == "finished") {
+			break;
+		}
+		int rc = inet_pton(AF_INET6, line, &ipv6_dst);
+		if (rc != 1) {
+			continue;
+		}
+
 		send_rate = (double)zconf.rate / zconf.senders;
 		if (count && delay > 0) {
 			if (send_rate < slow_rate) {
@@ -444,33 +436,6 @@ int send_run(sock_t st, shard_t *s)
 		s->state.sent++;
 		s->state.tried_sent++;
 
-		// IPv6
-		if (ipv6) {
-			int ret = ipv6_target_file_get_ipv6(&ipv6_dst);
-			if (ret != 0) {
-				log_debug("send", "send thread %hhu finished, no more target IPv6 addresses", s->thread_id);
-				goto cleanup;
-			}
-		} else {
-			// Get the next IP to scan
-			current_ip = shard_get_next_ip(s);
-			if (zconf.list_of_ips_filename &&
-				current_ip != ZMAP_SHARD_DONE) {
-				// If we have a list of IPs bitmap, ensure the next IP
-				// to scan is on the list.
-				while (!pbm_check(zsend.list_of_ips_pbm, current_ip)) {
-					current_ip = shard_get_next_ip(s);
-					s->state.tried_sent++;
-					if (current_ip == ZMAP_SHARD_DONE) {
-						log_debug(
-							"send",
-							"send thread %hhu shard finished in get_next_ip_loop depleted",
-							s->thread_id);
-						goto cleanup;
-					}
-				}
-			}
-		}
 	}
 cleanup:
 	s->cb(s->thread_id, s->arg);
