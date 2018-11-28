@@ -297,12 +297,12 @@ int send_run(sock_t st, shard_t *s)
 	probe_data = malloc(2*sizeof(struct in6_addr));
 	while (1) {
 		// Adaptive timing delay
-		memset(line, sizeof(line))
+		memset(line, 0, sizeof(line));
 		lock_file(stdin);
 		scanf("%s", &line);
 		unlock_file(stdin); 
 
-		if strcmp(line == "finished") {
+		if (strcmp(line == "finished") != 0) {
 			break;
 		}
 		int rc = inet_pton(AF_INET6, line, &ipv6_dst);
