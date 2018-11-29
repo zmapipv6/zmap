@@ -302,7 +302,7 @@ int send_run(sock_t st, shard_t *s)
 		scanf("%s", &line);
 		unlock_file(stdin); 
 
-		if (strcmp(line == "finished") != 0) {
+		if (strcmp(line, "finished") != 0) {
 			break;
 		}
 		int rc = inet_pton(AF_INET6, line, &ipv6_dst);
